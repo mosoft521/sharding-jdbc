@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
@@ -32,9 +33,12 @@ import lombok.ToString;
 @Getter
 @Setter
 @ToString
+@RequiredArgsConstructor
 public final class RouteContext {
     
     private final Collection<Table> tables = new LinkedHashSet<>();
+    
+    private SQLStatementType sqlStatementType;
     
     private SQLBuilder sqlBuilder;
 }
