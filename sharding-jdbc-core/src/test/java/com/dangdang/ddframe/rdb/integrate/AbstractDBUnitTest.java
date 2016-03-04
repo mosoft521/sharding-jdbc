@@ -17,8 +17,6 @@
 
 package com.dangdang.ddframe.rdb.integrate;
 
-import static org.dbunit.Assertion.assertEquals;
-
 import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -28,9 +26,9 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.sql.DataSource;
 
+import com.dangdang.ddframe.rdb.sharding.api.DatabaseType;
 import org.apache.commons.dbcp.BasicDataSource;
 import org.dbunit.DatabaseUnitException;
 import org.dbunit.IDatabaseTester;
@@ -44,7 +42,7 @@ import org.dbunit.operation.DatabaseOperation;
 import org.h2.tools.RunScript;
 import org.junit.Before;
 
-import com.dangdang.ddframe.rdb.sharding.api.DatabaseType;
+import static org.dbunit.Assertion.assertEquals;
 
 public abstract class AbstractDBUnitTest {
     
