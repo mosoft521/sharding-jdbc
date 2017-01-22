@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,33 +17,40 @@
 
 package com.dangdang.ddframe.rdb.sharding.router;
 
-import java.util.Collection;
-import java.util.List;
-
 import com.codahale.metrics.Timer.Context;
-import com.dangdang.ddframe.rdb.sharding.api.DatabaseType;
 import com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule;
+import com.dangdang.ddframe.rdb.sharding.constants.DatabaseType;
 import com.dangdang.ddframe.rdb.sharding.exception.SQLParserException;
-import com.dangdang.ddframe.rdb.sharding.exception.ShardingJdbcException;
+import com.dangdang.ddframe.rdb.sharding.hint.HintManagerHolder;
 import com.dangdang.ddframe.rdb.sharding.metrics.MetricsContext;
 import com.dangdang.ddframe.rdb.sharding.parser.SQLParserFactory;
 import com.dangdang.ddframe.rdb.sharding.parser.result.SQLParsedResult;
+import com.dangdang.ddframe.rdb.sharding.parser.result.merger.Limit;
 import com.dangdang.ddframe.rdb.sharding.parser.result.router.ConditionContext;
+import com.dangdang.ddframe.rdb.sharding.parser.result.router.RouteContext;
 import com.dangdang.ddframe.rdb.sharding.parser.result.router.SQLBuilder;
-import com.dangdang.ddframe.rdb.sharding.parser.result.router.SQLStatementType;
 import com.dangdang.ddframe.rdb.sharding.parser.result.router.Table;
 import com.dangdang.ddframe.rdb.sharding.router.binding.BindingTablesRouter;
+import com.dangdang.ddframe.rdb.sharding.router.database.DatabaseRouter;
 import com.dangdang.ddframe.rdb.sharding.router.mixed.MixedTablesRouter;
 import com.dangdang.ddframe.rdb.sharding.router.single.SingleTableRouter;
+import com.dangdang.ddframe.rdb.sharding.util.SQLUtil;
 import com.google.common.base.Function;
 import com.google.common.collect.Collections2;
+import com.google.common.collect.Sets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 
 /**
  * SQL路由引擎.
  * 
- * @author gaohongtao, zhangiang
+ * @author gaohongtao
+ * @author zhangiang
  */
 @RequiredArgsConstructor
 @Slf4j
@@ -55,53 +62,102 @@ public final class SQLRouteEngine {
     
     /**
      * SQL路由.
-     * 
+     *
      * @param logicSql 逻辑SQL
      * @return 路由结果
      * @throws SQLParserException SQL解析失败异常
      */
-    public SQLRouteResult route(final String logicSql, final List<Object> parameters) throws SQLParserException {
-        return routeSQL(parseSQL(logicSql, parameters));
+    public SQLRouteResult route(final String logicSql) throws SQLParserException {
+        return route(logicSql, Collections.emptyList());
     }
     
-    private SQLParsedResult parseSQL(final String logicSql, final List<Object> parameters) {
+    SQLRouteResult route(final String logicSql, final List<Object> parameters) throws SQLParserException {
+        return routeSQL(parseSQL(logicSql, parameters), parameters);
+    }
+    
+    /**
+     * 预解析SQL路由.
+     * 
+     * @param logicSql 逻辑SQL
+     * @return 预解析SQL路由器
+     */
+    public PreparedSQLRouter prepareSQL(final String logicSql) {
+        return new PreparedSQLRouter(logicSql, this, shardingRule);
+    }
+    
+    SQLParsedResult parseSQL(final String logicSql, final List<Object> parameters) {
+        if (HintManagerHolder.isDatabaseShardingOnly()) {
+            return buildHintParsedResult(logicSql);
+        }
         Context context = MetricsContext.start("Parse SQL");
-        SQLParsedResult result = SQLParserFactory.create(databaseType, logicSql, parameters, shardingRule.getAllShardingColumns()).parse();
+        SQLParsedResult result = SQLParserFactory.create(databaseType, logicSql, parameters, shardingRule).parse();
         MetricsContext.stop(context);
         return result;
     }
     
-    private SQLRouteResult routeSQL(final SQLParsedResult parsedResult) {
-        Context context = MetricsContext.start("Route SQL");
-        SQLRouteResult result = new SQLRouteResult(parsedResult.getMergeContext());
-        for (ConditionContext each : parsedResult.getConditionContexts()) {
-            result.getExecutionUnits().addAll(routeSQL(each, Collections2.transform(parsedResult.getRouteContext().getTables(), new Function<Table, String>() {
-                
-                @Override
-                public String apply(final Table input) {
-                    return input.getName();
-                }
-            }), parsedResult.getRouteContext().getSqlBuilder(), parsedResult.getRouteContext().getSqlStatementType()));
+    private SQLParsedResult buildHintParsedResult(final String logicSql) {
+        SQLParsedResult result = new SQLParsedResult();
+        RouteContext routeContext = result.getRouteContext();
+        routeContext.setSqlStatementType(SQLUtil.getTypeByStart(logicSql));
+        log.trace("Get {} SQL Statement", routeContext.getSqlStatementType());
+        SQLBuilder sqlBuilder = new SQLBuilder();
+        try {
+            sqlBuilder.append(logicSql);
+        } catch (final IOException ignored) {
         }
+        routeContext.setSqlBuilder(sqlBuilder);
+        result.getConditionContexts().add(new ConditionContext());
+        return result;
+    }
+    
+    SQLRouteResult routeSQL(final SQLParsedResult parsedResult, final List<Object> parameters) {
+        Context context = MetricsContext.start("Route SQL");
+        SQLRouteResult result = new SQLRouteResult(parsedResult.getRouteContext().getSqlStatementType(), parsedResult.getMergeContext(), parsedResult.getGeneratedKeyContext());
+        for (ConditionContext each : parsedResult.getConditionContexts()) {
+            RoutingResult routingResult = routeSQL(each, parsedResult);
+            result.getExecutionUnits().addAll(routingResult.getSQLExecutionUnits(parsedResult.getRouteContext().getSqlBuilder()));
+        }
+        amendSQLAccordingToRouteResult(parsedResult, parameters, result);
         MetricsContext.stop(context);
-        log.debug("final route result:{}", result.getExecutionUnits());
+        log.debug("final route result is {} target", result.getExecutionUnits().size());
+        for (SQLExecutionUnit each : result.getExecutionUnits()) {
+            log.debug("{}:{} {}", each.getDataSource(), each.getSql(), parameters);
+        }
         log.debug("merge context:{}", result.getMergeContext());
         return result;
     }
     
-    private Collection<SQLExecutionUnit> routeSQL(final ConditionContext conditionContext, final Collection<String> logicTables, final SQLBuilder sqlBuilder, final SQLStatementType type) {
-        RoutingResult result;
+    private RoutingResult routeSQL(final ConditionContext conditionContext, final SQLParsedResult parsedResult) {
+        if (HintManagerHolder.isDatabaseShardingOnly()) {
+            return new DatabaseRouter(shardingRule.getDataSourceRule(), shardingRule.getDatabaseShardingStrategy(), parsedResult.getRouteContext().getSqlStatementType()).route();
+        }
+        Set<String> logicTables = Sets.newLinkedHashSet(Collections2.transform(parsedResult.getRouteContext().getTables(), new Function<Table, String>() {
+            
+            @Override
+            public String apply(final Table input) {
+                return input.getName();
+            }
+        }));
         if (1 == logicTables.size()) {
-            result = new SingleTableRouter(shardingRule, logicTables.iterator().next(), conditionContext, type).route();
-        } else if (shardingRule.isAllBindingTable(logicTables)) {
-            result = new BindingTablesRouter(shardingRule, logicTables, conditionContext, type).route();
-        } else {
-            // TODO 可配置是否执行笛卡尔积
-            result = new MixedTablesRouter(shardingRule, logicTables, conditionContext, type).route();
+            return new SingleTableRouter(shardingRule, logicTables.iterator().next(), conditionContext, parsedResult.getRouteContext().getSqlStatementType()).route();
+        } 
+        if (shardingRule.isAllBindingTables(logicTables)) {
+            return new BindingTablesRouter(shardingRule, logicTables, conditionContext, parsedResult.getRouteContext().getSqlStatementType()).route();
+        } 
+        // TODO 可配置是否执行笛卡尔积
+        return new MixedTablesRouter(shardingRule, logicTables, conditionContext, parsedResult.getRouteContext().getSqlStatementType()).route();
+    }
+    
+    private void amendSQLAccordingToRouteResult(final SQLParsedResult parsedResult, final List<Object> parameters, final SQLRouteResult result) {
+        boolean isVarious = result.getExecutionUnits().size() > 1;
+        Limit limit = result.getMergeContext().getLimit();
+        SQLBuilder sqlBuilder = parsedResult.getRouteContext().getSqlBuilder();
+        if (null != limit) {
+            limit.replaceSQL(sqlBuilder, isVarious);
+            limit.replaceParameters(parameters, isVarious);
         }
-        if (null == result) {
-            throw new ShardingJdbcException("Sharding-JDBC: cannot route any result, please check your sharding rule.");
+        if (!isVarious) {
+            sqlBuilder.removeDerivedSQL();
         }
-        return result.getSQLExecutionUnits(sqlBuilder);
     }
 }

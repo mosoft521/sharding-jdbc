@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,88 +17,74 @@
 
 package com.dangdang.ddframe.rdb.sharding.config.common.internal.algorithm;
 
+import com.dangdang.ddframe.rdb.sharding.api.ShardingValue;
+import com.dangdang.ddframe.rdb.sharding.router.strategy.MultipleKeysShardingAlgorithm;
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.base.Strings;
+import com.google.common.collect.Sets;
+import groovy.lang.Binding;
+import groovy.lang.Closure;
+import groovy.lang.GroovyShell;
+import groovy.util.Expando;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import com.dangdang.ddframe.rdb.sharding.api.ShardingValue;
-import com.dangdang.ddframe.rdb.sharding.api.strategy.common.MultipleKeysShardingAlgorithm;
-import com.dangdang.ddframe.rdb.sharding.config.common.internal.ConfigUtil;
-import com.dangdang.ddframe.rdb.sharding.exception.SQLParserException;
-import com.google.common.base.Joiner;
-import com.google.common.collect.Lists;
-import groovy.lang.Closure;
-import groovy.util.Expando;
-import lombok.RequiredArgsConstructor;
-import org.slf4j.LoggerFactory;
 
 /**
  * 基于闭包的数据源划分算法.
  * 
  * @author gaohongtao
  */
-@RequiredArgsConstructor
 public class ClosureShardingAlgorithm implements MultipleKeysShardingAlgorithm {
     
-    private final Closure<String> closure;
+    private final Closure<?> closureTemplate;
+    
+    public ClosureShardingAlgorithm(final String expression, final String logRoot) {
+        Preconditions.checkArgument(!Strings.isNullOrEmpty(expression));
+        Preconditions.checkArgument(!Strings.isNullOrEmpty(logRoot));
+        Binding binding = new Binding();
+        binding.setVariable("log", LoggerFactory.getLogger(Joiner.on(".").join("com.dangdang.ddframe.rdb.sharding.configFile", logRoot.trim())));
+        closureTemplate = (Closure) new GroovyShell(binding).evaluate(Joiner.on("").join("{it -> \"", expression.trim(), "\"}"));
+    }
     
     @Override
     public Collection<String> doSharding(final Collection<String> availableTargetNames, final Collection<ShardingValue<?>> shardingValues) {
-        List<List<Comparable>> parametersDim = new ArrayList<>();
-        List<String> columnNameList = new ArrayList<>(shardingValues.size());
+        List<Set<Comparable>> valuesDim = new ArrayList<>();
+        List<String> columnNames = new ArrayList<>(shardingValues.size());
         for (ShardingValue<?> each : shardingValues) {
-            columnNameList.add(each.getColumnName());
+            columnNames.add(each.getColumnName());
             switch (each.getType()) {
                 case SINGLE:
-                    parametersDim.add(Lists.newArrayList((Comparable) each.getValue()));
+                    valuesDim.add(Sets.newHashSet((Comparable) each.getValue()));
                     break;
                 case LIST:
-                    parametersDim.add(new ArrayList<Comparable>(each.getValues()));
+                    valuesDim.add(Sets.<Comparable>newHashSet(each.getValues()));
                     break;
                 case RANGE:
-                    throw new UnsupportedOperationException("Config file does not support BETWEEN, please use Java API Config");
+                    throw new UnsupportedOperationException("Inline expression does not support BETWEEN, please use Java API Config");
                 default:
-                    throw new UnsupportedOperationException();
+                    throw new UnsupportedOperationException(each.getType().name());
             }
         }
-        
-        List<List<Comparable>> paramScenario = ConfigUtil.descartes(parametersDim);
-        
-        List<String> result = new ArrayList<>();
-        Set<String> availableTargetNameSet = new HashSet<>(availableTargetNames);
-        for (List<Comparable> each : paramScenario) {
-            Closure newClosure = closure.rehydrate(new Expando(), null, null);
-            newClosure.setResolveStrategy(Closure.DELEGATE_ONLY);
-            newClosure.setProperty("log", LoggerFactory.getLogger(Joiner.on(".").join("com.dangdang.ddframe.rdb.sharding.configFile", each)));
-            for (int i = 0; i < each.size(); i++) {
-                newClosure.setProperty(columnNameList.get(i), new ShardingValueWrapper(each.get(i)));
-            }
-            //jvm动态调用指令将会忽略Closure返回值的泛型,故此处采用两行代码进行数据转换.
-            Object algorithmResult = newClosure.call();
-            if (null == algorithmResult) {
-                throw new SQLParserException("No table route");
-            }
-            
-            if (algorithmResult instanceof ArrayList) {
-                for (Object innerResult : (ArrayList) algorithmResult) {
-                    result.add(filterResult(innerResult, availableTargetNameSet));
-                }
-            } else {
-                result.add(filterResult(algorithmResult, availableTargetNameSet));
-            }
-    
+        Set<List<Comparable>> cartesianValues = Sets.cartesianProduct(valuesDim);
+        List<String> result = new ArrayList<>(cartesianValues.size());
+        for (List<Comparable> each : cartesianValues) {
+            result.add(cloneClosure(columnNames, each).call().toString());
         }
         return result;
     }
     
-    private String filterResult(final Object algorithmResult, final Set<String> availableTargetNameSet) {
-        String stringAlgorithmResult = algorithmResult.toString();
-        if (!availableTargetNameSet.contains(stringAlgorithmResult)) {
-            throw new SQLParserException("Routing target %s does not contain in availableTargetNames %s", stringAlgorithmResult, availableTargetNameSet);
+    private Closure<?> cloneClosure(final List<String> columnNames, final List<Comparable> values) {
+        Closure<?> result = closureTemplate.rehydrate(new Expando(), null, null);
+        result.setResolveStrategy(Closure.DELEGATE_ONLY);
+        result.setProperty("log", closureTemplate.getProperty("log"));
+        for (int i = 0; i < values.size(); i++) {
+            result.setProperty(columnNames.get(i), new ShardingValueWrapper(values.get(i)));
         }
-        return stringAlgorithmResult;
+        return result;
     }
-    
 }

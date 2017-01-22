@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,6 +17,19 @@
 
 package com.dangdang.ddframe.rdb.sharding.jdbc;
 
+import com.codahale.metrics.Timer.Context;
+import com.dangdang.ddframe.rdb.sharding.hint.HintManagerHolder;
+import com.dangdang.ddframe.rdb.sharding.jdbc.adapter.AbstractConnectionAdapter;
+import com.dangdang.ddframe.rdb.sharding.metrics.MetricsContext;
+import com.dangdang.ddframe.rdb.sharding.parser.result.router.SQLStatementType;
+import com.google.common.base.Joiner;
+import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -25,20 +38,6 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import javax.sql.DataSource;
-
-import com.codahale.metrics.Timer.Context;
-import com.dangdang.ddframe.rdb.sharding.api.rule.DataSourceRule;
-import com.dangdang.ddframe.rdb.sharding.exception.ShardingJdbcException;
-import com.dangdang.ddframe.rdb.sharding.jdbc.adapter.AbstractConnectionAdapter;
-import com.dangdang.ddframe.rdb.sharding.metrics.MetricsContext;
-import com.google.common.base.Function;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Collections2;
-import com.google.common.collect.Lists;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 /**
  * 支持分片的数据库连接.
@@ -52,85 +51,98 @@ public final class ShardingConnection extends AbstractConnectionAdapter {
     @Getter(AccessLevel.PACKAGE)
     private final ShardingContext shardingContext;
     
-    private Map<String, Connection> connectionMap = new HashMap<>();
+    private final Map<String, Connection> connectionMap = new HashMap<>();
     
     /**
      * 根据数据源名称获取相应的数据库连接.
      * 
      * @param dataSourceName 数据源名称
+     * @param sqlStatementType SQL语句类型
      * @return 数据库连接
      */
-    public Connection getConnection(final String dataSourceName) throws SQLException {
-        if (connectionMap.containsKey(dataSourceName)) {
-            return connectionMap.get(dataSourceName);
+    public Connection getConnection(final String dataSourceName, final SQLStatementType sqlStatementType) throws SQLException {
+        Connection result = getConnectionInternal(dataSourceName, sqlStatementType);
+        replayMethodsInvocation(result);
+        return result;
+    }
+    
+    /**
+     * 释放缓存中已经中断的数据库连接.
+     * 
+     * @param brokenConnection 已经中断的数据库连接
+     */
+    public void releaseBrokenConnection(final Connection brokenConnection) {
+        Preconditions.checkNotNull(brokenConnection);
+        closeConnection(brokenConnection);
+        connectionMap.values().remove(brokenConnection);
+    }
+    
+    private void closeConnection(final Connection connection) {
+        if (null != connection) {
+            try {
+                connection.close();
+            } catch (final SQLException ignored) {
+            }
         }
-        Context metricsContext = MetricsContext.start("ShardingConnection-getConnection", dataSourceName);
-        Connection connection = shardingContext.getShardingRule().getDataSourceRule().getDataSource(dataSourceName).getConnection();
-        MetricsContext.stop(metricsContext);
-        replayMethodsInvovation(connection);
-        connectionMap.put(dataSourceName, connection);
-        return connection;
     }
     
     @Override
     public DatabaseMetaData getMetaData() throws SQLException {
-        if (connectionMap.isEmpty()) {
-            DataSourceRule dataSourceRule = shardingContext.getShardingRule().getDataSourceRule();
-            String dsName = dataSourceRule.getDataSourceNames().iterator().next();
-            connectionMap.put(dsName, dataSourceRule.getDataSource(dsName).getConnection());
-        }
-        return getDatabaseMetaDataFromConnection(connectionMap.values().iterator().next());
+        return getConnection(shardingContext.getShardingRule().getDataSourceRule().getDataSourceNames().iterator().next(), SQLStatementType.SELECT).getMetaData();
     }
     
-    public static DatabaseMetaData getDatabaseMetaDataFromDataSource(final Collection<DataSource> dataSources) {
-        Collection<Connection> connections = null;
-        try {
-            connections = Collections2.transform(dataSources, new Function<DataSource, Connection>() {
-                
-                @Override
-                public Connection apply(final DataSource input) {
-                    try {
-                        return input.getConnection();
-                    } catch (final SQLException ex) {
-                        throw new ShardingJdbcException(ex);
-                    }
-                }
-            });
-            return getDatabaseMetaDataFromConnection(connections);
-        } finally {
-            if (null != connections) {
-                for (Connection each : connections) {
-                    try {
-                        each.close();
-                    } catch (final SQLException ignored) {
-                    }
-                }
-            }
+    private Connection getConnectionInternal(final String dataSourceName, final SQLStatementType sqlStatementType) throws SQLException {
+        Optional<Connection> connectionOptional = fetchCachedConnectionBySqlStatementType(dataSourceName, sqlStatementType);
+        if (connectionOptional.isPresent()) {
+            return connectionOptional.get();
         }
-    }
-    
-    private static DatabaseMetaData getDatabaseMetaDataFromConnection(final Connection connection) {
-        return getDatabaseMetaDataFromConnection(Lists.newArrayList(connection));
-    }
-    
-    private static DatabaseMetaData getDatabaseMetaDataFromConnection(final Collection<Connection> connections) {
-        String databaseProductName = null;
-        DatabaseMetaData result = null;
-        for (Connection each : connections) {
-            String databaseProductNameInEach;
-            DatabaseMetaData metaDataInEach;
-            try {
-                metaDataInEach = each.getMetaData();
-                databaseProductNameInEach = metaDataInEach.getDatabaseProductName();
-            } catch (final SQLException ex) {
-                throw new ShardingJdbcException("Can not get data source DatabaseProductName", ex);
-            }
-            Preconditions.checkState(null == databaseProductName || databaseProductName.equals(databaseProductNameInEach),
-                    String.format("Database type inconsistent with '%s' and '%s'", databaseProductName, databaseProductNameInEach));
-            databaseProductName = databaseProductNameInEach;
-            result = metaDataInEach;
+        Context metricsContext = MetricsContext.start(Joiner.on("-").join("ShardingConnection-getConnection", dataSourceName));
+        DataSource dataSource = shardingContext.getShardingRule().getDataSourceRule().getDataSource(dataSourceName);
+        Preconditions.checkState(null != dataSource, "Missing the rule of %s in DataSourceRule", dataSourceName);
+        String realDataSourceName = dataSourceName;
+        if (dataSource instanceof MasterSlaveDataSource) {
+            dataSource = ((MasterSlaveDataSource) dataSource).getDataSource(sqlStatementType);
+            realDataSourceName = getRealDataSourceName(dataSourceName, sqlStatementType);
         }
+        Connection result = dataSource.getConnection();
+        MetricsContext.stop(metricsContext);
+        connectionMap.put(realDataSourceName, result);
         return result;
+    }
+    
+    private String getRealDataSourceName(final String dataSourceName, final SQLStatementType sqlStatementType) {
+        String slaveDataSourceName = getSlaveDataSourceName(dataSourceName);
+        if (!MasterSlaveDataSource.isDML(sqlStatementType)) {
+            return slaveDataSourceName;
+        }
+        closeConnection(connectionMap.remove(slaveDataSourceName));
+        return getMasterDataSourceName(dataSourceName);
+    }
+    
+    private Optional<Connection> fetchCachedConnectionBySqlStatementType(final String dataSourceName, final SQLStatementType sqlStatementType) {
+        if (connectionMap.containsKey(dataSourceName)) {
+            return Optional.of(connectionMap.get(dataSourceName));
+        }
+        String masterDataSourceName = getMasterDataSourceName(dataSourceName);
+        if (connectionMap.containsKey(masterDataSourceName)) {
+            return Optional.of(connectionMap.get(masterDataSourceName));
+        }
+        if (MasterSlaveDataSource.isDML(sqlStatementType)) {
+            return Optional.absent();
+        }
+        String slaveDataSourceName = getSlaveDataSourceName(dataSourceName);
+        if (connectionMap.containsKey(slaveDataSourceName)) {
+            return Optional.of(connectionMap.get(slaveDataSourceName));
+        }
+        return Optional.absent();
+    }
+    
+    private String getMasterDataSourceName(final String dataSourceName) {
+        return Joiner.on("-").join(dataSourceName, "SHARDING-JDBC", "MASTER");
+    }
+    
+    private String getSlaveDataSourceName(final String dataSourceName) {
+        return Joiner.on("-").join(dataSourceName, "SHARDING-JDBC", "SLAVE");
     }
     
     @Override
@@ -181,5 +193,12 @@ public final class ShardingConnection extends AbstractConnectionAdapter {
     @Override
     public Collection<Connection> getConnections() {
         return connectionMap.values();
+    }
+    
+    @Override
+    public void close() throws SQLException {
+        super.close();
+        HintManagerHolder.clear();
+        MasterSlaveDataSource.resetDMLFlag();
     }
 }

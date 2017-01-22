@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,105 +17,64 @@
 
 package com.dangdang.ddframe.rdb.sharding.config.common.api;
 
-import java.io.IOException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.util.Collections;
-import java.util.Map;
-import javax.sql.DataSource;
-
 import com.dangdang.ddframe.rdb.sharding.api.rule.BindingTableRule;
 import com.dangdang.ddframe.rdb.sharding.api.rule.DataSourceRule;
 import com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule;
+import com.dangdang.ddframe.rdb.sharding.api.rule.TableRule;
 import com.dangdang.ddframe.rdb.sharding.api.strategy.database.DatabaseShardingStrategy;
-import com.dangdang.ddframe.rdb.sharding.api.strategy.database.NoneDatabaseShardingAlgorithm;
-import com.dangdang.ddframe.rdb.sharding.api.strategy.table.NoneTableShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.api.strategy.database.MultipleKeysDatabaseShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.api.strategy.database.SingleKeyDatabaseShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.api.strategy.table.MultipleKeysTableShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.api.strategy.table.SingleKeyTableShardingAlgorithm;
 import com.dangdang.ddframe.rdb.sharding.api.strategy.table.TableShardingStrategy;
+import com.dangdang.ddframe.rdb.sharding.config.common.api.config.AutoIncrementColumnConfig;
+import com.dangdang.ddframe.rdb.sharding.config.common.api.config.BindingTableRuleConfig;
 import com.dangdang.ddframe.rdb.sharding.config.common.api.config.ShardingRuleConfig;
-import com.dangdang.ddframe.rdb.sharding.config.common.internal.AbstractShardingRuleConfigFileDelegate;
-import com.google.common.base.Joiner;
+import com.dangdang.ddframe.rdb.sharding.config.common.api.config.StrategyConfig;
+import com.dangdang.ddframe.rdb.sharding.config.common.api.config.TableRuleConfig;
+import com.dangdang.ddframe.rdb.sharding.config.common.internal.algorithm.ClosureDatabaseShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.config.common.internal.algorithm.ClosureTableShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.config.common.internal.parser.InlineParser;
+import com.dangdang.ddframe.rdb.sharding.id.generator.IdGenerator;
+import com.dangdang.ddframe.rdb.sharding.router.strategy.MultipleKeysShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.router.strategy.ShardingAlgorithm;
+import com.dangdang.ddframe.rdb.sharding.router.strategy.ShardingStrategy;
+import com.dangdang.ddframe.rdb.sharding.router.strategy.SingleKeyShardingAlgorithm;
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import groovy.lang.Binding;
-import groovy.lang.GroovyShell;
-import lombok.Getter;
-import org.codehaus.groovy.control.CompilerConfiguration;
-import org.slf4j.LoggerFactory;
+import com.google.common.base.Strings;
+import com.google.common.collect.Lists;
+import lombok.AllArgsConstructor;
+import org.apache.commons.collections4.MapUtils;
+
+import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * 分片规则构建器.
  * 
  * @author gaohongtao
  */
-public class ShardingRuleBuilder {
+@AllArgsConstructor
+public final class ShardingRuleBuilder {
     
-    private Map<String, DataSource> dataSourceMap;
+    private final String logRoot;
     
-    @Getter
-    private AbstractShardingRuleConfigFileDelegate ruleConfigDelegate;
+    private final Map<String, DataSource> externalDataSourceMap;
     
-    private DataSourceRule dataSourceRule;
+    private final ShardingRuleConfig shardingRuleConfig;
     
-    /**
-     * 设置数据源映射.
-     * 
-     * @param dataSourceMap 数据源映射
-     * @return 构建器对象
-     */
-    public ShardingRuleBuilder setDataSourceMap(final Map<String, DataSource> dataSourceMap) {
-        this.dataSourceMap = dataSourceMap;
-        return this;
+    public ShardingRuleBuilder(final ShardingRuleConfig shardingRuleConfig) {
+        this("default", shardingRuleConfig);
     }
     
-    /**
-     * 解析规则配置对象中的规则配置.
-     * 
-     * @param config 规则配置对象
-     * @return 构建器对象
-     */
-    public ShardingRuleBuilder parse(final ShardingRuleConfig config) {
-        return parse("default", config);
-    }
-    
-    /**
-     * 解析规则配置对象中的规则配置.
-     * 
-     * @param logRoot 规则名称
-     * @param config 规则配置对象
-     * @return 构建器对象
-     */
-    public ShardingRuleBuilder parse(final String logRoot, final ShardingRuleConfig config) {
-        if (null == dataSourceMap && null != config.getDataSource()) {
-            dataSourceMap = config.getDataSource();
-        }
-        Binding binding = new Binding();
-        binding.setProperty("shardingRuleConfig", config);
-        GroovyShell shell = new GroovyShell(binding);
-        URL templateUrl = this.getClass().getClassLoader().getResource("shardingJDBC_config_template.groovy");
-        Preconditions.checkNotNull(templateUrl);
-        Object result;
-        try {
-            result = shell.run(templateUrl.toURI(), new String[]{});
-        } catch (final IOException | URISyntaxException ignored) {
-            throw new UnsupportedOperationException("can not load template");
-        }
-        ruleConfigDelegate = (AbstractShardingRuleConfigFileDelegate) getShell(logRoot).parse(result.toString());
-        initDelegate();
-        return this;
-    }
-    
-    private GroovyShell getShell(final String logRoot) {
-        CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
-        compilerConfiguration.setScriptBaseClass(AbstractShardingRuleConfigFileDelegate.class.getName());
-        Binding binding = new Binding();
-        binding.setVariable("log", LoggerFactory.getLogger(Joiner.on(".").join("com.dangdang.ddframe.rdb.sharding.configFile", logRoot)));
-        return new GroovyShell(binding, compilerConfiguration);
-    }
-    
-    private void initDelegate() {
-        if (null != dataSourceMap) {
-            dataSourceRule = new DataSourceRule(dataSourceMap);
-            ruleConfigDelegate.setDataSourceRule(dataSourceRule);
-        }
+    public ShardingRuleBuilder(final String logRoot, final ShardingRuleConfig shardingRuleConfig) {
+        this(logRoot, Collections.<String, DataSource>emptyMap(), shardingRuleConfig);
     }
     
     /**
@@ -124,15 +83,121 @@ public class ShardingRuleBuilder {
      * @return 分片规则对象
      */
     public ShardingRule build() {
-        ruleConfigDelegate.run();
-        Preconditions.checkNotNull(ruleConfigDelegate.getTableRules(), "Sharding JDBC: Config file must contains table config");
-        
-        return new ShardingRule(ruleConfigDelegate.getDataSourceRule(), ruleConfigDelegate.getTableRules(),
-                null == ruleConfigDelegate.getBindingTableRules() ? Collections.<BindingTableRule>emptyList() : ruleConfigDelegate.getBindingTableRules(),
-                null == ruleConfigDelegate.getDefaultDatabaseShardingStrategy() ? new DatabaseShardingStrategy(Collections.<String>emptyList(),
-                        new NoneDatabaseShardingAlgorithm()) : ruleConfigDelegate.getDefaultDatabaseShardingStrategy(),
-                null == ruleConfigDelegate.getDefaultTableShardingStrategy() ? new TableShardingStrategy(Collections.<String>emptyList(),
-                        new NoneTableShardingAlgorithm()) : ruleConfigDelegate.getDefaultTableShardingStrategy());
+        DataSourceRule dataSourceRule = buildDataSourceRule();
+        Collection<TableRule> tableRules = buildTableRules(dataSourceRule);
+        com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule.ShardingRuleBuilder shardingRuleBuilder = ShardingRule.builder().dataSourceRule(dataSourceRule);
+        if (!Strings.isNullOrEmpty(shardingRuleConfig.getIdGeneratorClass())) {
+            shardingRuleBuilder.idGenerator(loadClass(shardingRuleConfig.getIdGeneratorClass(), IdGenerator.class));
+        }
+        return shardingRuleBuilder.tableRules(tableRules).bindingTableRules(buildBindingTableRules(tableRules))
+                .databaseShardingStrategy(buildShardingStrategy(shardingRuleConfig.getDefaultDatabaseStrategy(), DatabaseShardingStrategy.class))
+                .tableShardingStrategy(buildShardingStrategy(shardingRuleConfig.getDefaultTableStrategy(), TableShardingStrategy.class)).build();
     }
     
+    private DataSourceRule buildDataSourceRule() {
+        Preconditions.checkArgument(!shardingRuleConfig.getDataSource().isEmpty() || MapUtils.isNotEmpty(externalDataSourceMap), "Sharding JDBC: No data source config");
+        return shardingRuleConfig.getDataSource().isEmpty() ? new DataSourceRule(externalDataSourceMap, shardingRuleConfig.getDefaultDataSourceName())
+                : new DataSourceRule(shardingRuleConfig.getDataSource(), shardingRuleConfig.getDefaultDataSourceName());
+    }
+    
+    private Collection<TableRule> buildTableRules(final DataSourceRule dataSourceRule) {
+        Collection<TableRule> result = new ArrayList<>(shardingRuleConfig.getTables().size());
+        for (Entry<String, TableRuleConfig> each : shardingRuleConfig.getTables().entrySet()) {
+            String logicTable = each.getKey();
+            TableRuleConfig tableRuleConfig = each.getValue();
+            TableRule.TableRuleBuilder tableRuleBuilder = TableRule.builder(logicTable).dataSourceRule(dataSourceRule)
+                    .dynamic(tableRuleConfig.isDynamic())
+                    .databaseShardingStrategy(buildShardingStrategy(tableRuleConfig.getDatabaseStrategy(), DatabaseShardingStrategy.class))
+                    .tableShardingStrategy(buildShardingStrategy(tableRuleConfig.getTableStrategy(), TableShardingStrategy.class));
+            if (null != tableRuleConfig.getActualTables()) {
+                tableRuleBuilder.actualTables(new InlineParser(tableRuleConfig.getActualTables()).evaluate());
+            }
+            if (!Strings.isNullOrEmpty(tableRuleConfig.getDataSourceNames())) {
+                tableRuleBuilder.dataSourceNames(new InlineParser(tableRuleConfig.getDataSourceNames()).evaluate());
+            }
+            buildAutoIncrementColumn(tableRuleBuilder, tableRuleConfig);
+            result.add(tableRuleBuilder.build());
+        }
+        return result;
+    }
+    
+    private void buildAutoIncrementColumn(final TableRule.TableRuleBuilder tableRuleBuilder, final TableRuleConfig tableRuleConfig) {
+        for (AutoIncrementColumnConfig each : tableRuleConfig.getAutoIncrementColumns()) {
+            if (Strings.isNullOrEmpty(each.getColumnIdGeneratorClass())) {
+                tableRuleBuilder.autoIncrementColumns(each.getColumnName());
+            } else {
+                tableRuleBuilder.autoIncrementColumns(each.getColumnName(), loadClass(each.getColumnIdGeneratorClass(), IdGenerator.class));
+            }
+        }
+    }
+    
+    private Collection<BindingTableRule> buildBindingTableRules(final Collection<TableRule> tableRules) {
+        Collection<BindingTableRule> result = new ArrayList<>(shardingRuleConfig.getBindingTables().size());
+        for (BindingTableRuleConfig each : shardingRuleConfig.getBindingTables()) {
+            result.add(new BindingTableRule(Lists.transform(new InlineParser(each.getTableNames()).split(), new Function<String, TableRule>() {
+                
+                @Override
+                public TableRule apply(final String input) {
+                    return findTableRuleByLogicTableName(tableRules, input);
+                }
+            })));
+        }
+        return result;
+    }
+    
+    private TableRule findTableRuleByLogicTableName(final Collection<TableRule> tableRules, final String logicTableName) {
+        for (TableRule each : tableRules) {
+            if (logicTableName.equals(each.getLogicTable())) {
+                return each;
+            }
+        }
+        throw new IllegalArgumentException(String.format("Sharding JDBC: Binding table `%s` is not an available Table rule", logicTableName));
+    }
+    
+    private <T extends ShardingStrategy> T buildShardingStrategy(final StrategyConfig config, final Class<T> returnClass) {
+        if (null == config) {
+            return null;
+        }
+        Preconditions.checkArgument(Strings.isNullOrEmpty(config.getAlgorithmExpression()) && !Strings.isNullOrEmpty(config.getAlgorithmClassName())
+                || !Strings.isNullOrEmpty(config.getAlgorithmExpression()) && Strings.isNullOrEmpty(config.getAlgorithmClassName()));
+        Preconditions.checkState(returnClass.isAssignableFrom(DatabaseShardingStrategy.class) || returnClass.isAssignableFrom(TableShardingStrategy.class), "Sharding-JDBC: returnClass is illegal");
+        List<String> shardingColumns = new InlineParser(config.getShardingColumns()).split();
+        if (Strings.isNullOrEmpty(config.getAlgorithmClassName())) {
+            return buildShardingAlgorithmExpression(shardingColumns, config.getAlgorithmExpression(), returnClass);
+        }
+        return buildShardingAlgorithmClassName(shardingColumns, config.getAlgorithmClassName(), returnClass);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private <T extends ShardingStrategy> T buildShardingAlgorithmExpression(final List<String> shardingColumns, final String algorithmExpression, final Class<T> returnClass) {
+        return returnClass.isAssignableFrom(DatabaseShardingStrategy.class) ? (T) new DatabaseShardingStrategy(shardingColumns, new ClosureDatabaseShardingAlgorithm(algorithmExpression, logRoot))
+                : (T) new TableShardingStrategy(shardingColumns, new ClosureTableShardingAlgorithm(algorithmExpression, logRoot));
+    }
+    
+    @SuppressWarnings("unchecked")
+    private <T extends ShardingStrategy> T buildShardingAlgorithmClassName(final List<String> shardingColumns, final String algorithmClassName, final Class<T> returnClass) {
+        ShardingAlgorithm shardingAlgorithm;
+        try {
+            shardingAlgorithm = (ShardingAlgorithm) Class.forName(algorithmClassName).newInstance();
+        } catch (final InstantiationException | IllegalAccessException | ClassNotFoundException ex) {
+            throw new IllegalArgumentException(ex);
+        }
+        Preconditions.checkState(shardingAlgorithm instanceof SingleKeyShardingAlgorithm || shardingAlgorithm instanceof MultipleKeysShardingAlgorithm, "Sharding-JDBC: algorithmClassName is illegal");
+        if (shardingAlgorithm instanceof SingleKeyShardingAlgorithm) {
+            Preconditions.checkArgument(1 == shardingColumns.size(), "Sharding-JDBC: SingleKeyShardingAlgorithm must have only ONE sharding column");
+            return returnClass.isAssignableFrom(DatabaseShardingStrategy.class) ? (T) new DatabaseShardingStrategy(shardingColumns.get(0), (SingleKeyDatabaseShardingAlgorithm<?>) shardingAlgorithm)
+                    : (T) new TableShardingStrategy(shardingColumns.get(0), (SingleKeyTableShardingAlgorithm<?>) shardingAlgorithm);
+        }
+        return returnClass.isAssignableFrom(DatabaseShardingStrategy.class) ? (T) new DatabaseShardingStrategy(shardingColumns, (MultipleKeysDatabaseShardingAlgorithm) shardingAlgorithm) 
+                : (T) new TableShardingStrategy(shardingColumns, (MultipleKeysTableShardingAlgorithm) shardingAlgorithm);
+    }
+    
+    @SuppressWarnings("unchecked")
+    private <T> Class<? extends T> loadClass(final String className, final Class<T> superClass) {
+        try {
+            return (Class<? extends T>) superClass.getClassLoader().loadClass(className);
+        } catch (final ClassNotFoundException ex) {
+            throw new IllegalArgumentException(ex);
+        }
+    }
 }

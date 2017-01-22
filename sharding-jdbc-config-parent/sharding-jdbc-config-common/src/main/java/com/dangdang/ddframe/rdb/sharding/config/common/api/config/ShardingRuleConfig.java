@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,14 +17,14 @@
 
 package com.dangdang.ddframe.rdb.sharding.config.common.api.config;
 
+import lombok.Getter;
+import lombok.Setter;
+
+import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.sql.DataSource;
-
-import lombok.Getter;
-import lombok.Setter;
 
 /**
  * 分片规则配置.
@@ -37,6 +37,8 @@ public class ShardingRuleConfig {
     
     private Map<String, DataSource> dataSource = new HashMap<>();
     
+    private String defaultDataSourceName;
+    
     private Map<String, TableRuleConfig> tables = new HashMap<>();
     
     private List<BindingTableRuleConfig> bindingTables = new ArrayList<>();
@@ -44,4 +46,6 @@ public class ShardingRuleConfig {
     private StrategyConfig defaultDatabaseStrategy;
     
     private StrategyConfig defaultTableStrategy;
+    
+    private String idGeneratorClass;
 }

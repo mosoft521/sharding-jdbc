@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,12 +17,12 @@
 
 package com.dangdang.ddframe.rdb.sharding.jdbc.util;
 
+import com.dangdang.ddframe.rdb.sharding.exception.ShardingJdbcException;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-
-import com.dangdang.ddframe.rdb.sharding.exception.ShardingJdbcException;
-
-import lombok.RequiredArgsConstructor;
 
 /**
  * 反射调用JDBC相关方法的工具类.
@@ -32,8 +32,10 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public final class JdbcMethodInvocation {
     
+    @Getter
     private final Method method;
     
+    @Getter
     private final Object[] arguments;
     
     /**

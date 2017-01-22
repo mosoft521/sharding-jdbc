@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,15 +17,13 @@
 
 package com.dangdang.ddframe.rdb.sharding.parser;
 
-import java.util.Collection;
-import java.util.List;
-
 import com.alibaba.druid.sql.ast.SQLStatement;
 import com.alibaba.druid.sql.ast.statement.SQLDeleteStatement;
 import com.alibaba.druid.sql.ast.statement.SQLInsertStatement;
 import com.alibaba.druid.sql.ast.statement.SQLSelectStatement;
 import com.alibaba.druid.sql.ast.statement.SQLUpdateStatement;
 import com.alibaba.druid.sql.visitor.SQLASTOutputVisitor;
+import com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule;
 import com.dangdang.ddframe.rdb.sharding.exception.SQLParserException;
 import com.dangdang.ddframe.rdb.sharding.parser.result.SQLParsedResult;
 import com.dangdang.ddframe.rdb.sharding.parser.result.router.SQLStatementType;
@@ -35,10 +33,13 @@ import com.google.common.base.Preconditions;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+
 /**
  * 不包含OR语句的SQL构建器解析.
  * 
- * @author gaohongtao, zhangliang
+ * @author gaohongtao
+ * @author zhangliang
  */
 @RequiredArgsConstructor
 @Slf4j
@@ -50,7 +51,7 @@ public final class SQLParseEngine {
     
     private final SQLASTOutputVisitor visitor;
     
-    private final Collection<String> shardingColumns;
+    private final ShardingRule shardingRule;
     
     /**
      *  解析SQL.
@@ -61,15 +62,13 @@ public final class SQLParseEngine {
         Preconditions.checkArgument(visitor instanceof SQLVisitor);
         SQLVisitor sqlVisitor = (SQLVisitor) visitor;
         visitor.setParameters(parameters);
-        sqlVisitor.getParseContext().setShardingColumns(shardingColumns);
+        sqlVisitor.getParseContext().setShardingRule(shardingRule);
         sqlStatement.accept(visitor);
-        SQLParsedResult result;
+        SQLParsedResult result = sqlVisitor.getParseContext().getParsedResult();
         if (sqlVisitor.getParseContext().isHasOrCondition()) {
-            result = new OrParser(sqlStatement, visitor).parse();
-        } else {
-            sqlVisitor.getParseContext().mergeCurrentConditionContext();
-            result = sqlVisitor.getParseContext().getParsedResult();
-        }
+            new OrParser(sqlStatement, visitor).fillConditionContext(result);
+        } 
+        sqlVisitor.getParseContext().mergeCurrentConditionContext();
         log.debug("Parsed SQL result: {}", result);
         log.debug("Parsed SQL: {}", sqlVisitor.getSQLBuilder());
         result.getRouteContext().setSqlBuilder(sqlVisitor.getSQLBuilder());

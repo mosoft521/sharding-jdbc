@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,14 +17,16 @@
 
 package com.dangdang.ddframe.rdb.sharding.jdbc.adapter;
 
+import com.dangdang.ddframe.rdb.sharding.jdbc.unsupported.AbstractUnsupportedOperationConnection;
+import com.dangdang.ddframe.rdb.sharding.metrics.MetricsContext;
+import com.dangdang.ddframe.rdb.sharding.util.SQLUtil;
+import com.dangdang.ddframe.rdb.sharding.util.ThrowableSQLExceptionMethod;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.util.Collection;
-
-import com.dangdang.ddframe.rdb.sharding.jdbc.unsupported.AbstractUnsupportedOperationConnection;
-import com.dangdang.ddframe.rdb.sharding.metrics.ThreadLocalObjectContainer;
 
 /**
  * 数据库连接适配类.
@@ -69,18 +71,24 @@ public abstract class AbstractConnectionAdapter extends AbstractUnsupportedOpera
     
     @Override
     public final void rollback() throws SQLException {
-        for (Connection each : getConnections()) {
-            each.rollback();
-        }
+        SQLUtil.safeInvoke(getConnections(), new ThrowableSQLExceptionMethod<Connection>() {
+            @Override
+            public void apply(final Connection object) throws SQLException {
+                object.rollback();
+            }
+        });
     }
     
     @Override
-    public final void close() throws SQLException {
-        for (Connection each : getConnections()) {
-            each.close();
-        }
+    public void close() throws SQLException {
+        SQLUtil.safeInvoke(getConnections(), new ThrowableSQLExceptionMethod<Connection>() {
+            @Override
+            public void apply(final Connection object) throws SQLException {
+                object.close();
+            }
+        });
         closed = true;
-        ThreadLocalObjectContainer.clear();
+        MetricsContext.clear();
     }
     
     @Override

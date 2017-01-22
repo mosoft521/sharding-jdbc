@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,25 +17,26 @@
 
 package com.dangdang.ddframe.rdb.sharding.executor;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
-
-import com.dangdang.ddframe.rdb.sharding.api.config.ShardingConfiguration;
-import com.dangdang.ddframe.rdb.sharding.api.config.ShardingConfigurationConstant;
+import com.dangdang.ddframe.rdb.sharding.config.ShardingProperties;
+import com.dangdang.ddframe.rdb.sharding.config.ShardingPropertiesConstant;
 import com.dangdang.ddframe.rdb.sharding.exception.ShardingJdbcException;
-import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import lombok.extern.slf4j.Slf4j;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 多线程执行框架.
@@ -47,17 +48,17 @@ public final class ExecutorEngine {
     
     private final ListeningExecutorService executorService;
     
-    public ExecutorEngine(final ShardingConfiguration configuration) {
-        executorService = MoreExecutors.listeningDecorator(MoreExecutors.getExitingExecutorService(
-                new ThreadPoolExecutor(configuration.getConfig(ShardingConfigurationConstant.PARALLEL_EXECUTOR_WORKER_MIN_IDLE_SIZE, int.class),
-                configuration.getConfig(ShardingConfigurationConstant.PARALLEL_EXECUTOR_WORKER_MAX_SIZE, int.class),
-                configuration.getConfig(ShardingConfigurationConstant.PARALLEL_EXECUTOR_WORKER_MAX_IDLE_TIMEOUT, long.class),
-                TimeUnit.valueOf(configuration.getConfig(ShardingConfigurationConstant.PARALLEL_EXECUTOR_WORKER_MAX_IDLE_TIMEOUT_TIME_UNIT)),
-                new LinkedBlockingQueue<Runnable>())));
+    public ExecutorEngine(final ShardingProperties shardingProperties) {
+        int executorSize = shardingProperties.getValue(ShardingPropertiesConstant.EXECUTOR_SIZE);
+        executorService = MoreExecutors.listeningDecorator(new ThreadPoolExecutor(executorSize, executorSize, 0, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(), new ThreadFactoryBuilder()
+                        .setDaemon(true).setNameFormat("ShardingJDBC-%d").build()));
+        MoreExecutors.addDelayedShutdownHook(executorService, 60, TimeUnit.SECONDS);
     }
     
     /**
      * 多线程执行任务.
+     * 一组任务中,将第一个任务放在当前线程中执行,其余的任务放到线程池中运行.
+     * 
      * 
      * @param inputs 输入参数
      * @param executeUnit 执行单元
@@ -66,9 +67,26 @@ public final class ExecutorEngine {
      * @return 执行结果
      */
     public <I, O> List<O> execute(final Collection<I> inputs, final ExecuteUnit<I, O> executeUnit) {
-        ListenableFuture<List<O>> futures = submitFutures(inputs, executeUnit);
-        addCallback(futures);
-        return getFutureResults(futures);
+        Iterator<I> iterator = inputs.iterator();
+        if (!iterator.hasNext()) {
+            return Collections.emptyList();
+        }
+        I firstInput = iterator.next();
+        ListenableFuture<List<O>> restListFuture = asyncRun(Lists.newArrayList(iterator), executeUnit);
+        O firstOutput;
+        List<O> restOutputs;
+        try {
+            firstOutput = executeUnit.execute(firstInput);
+            restOutputs = restListFuture.get();
+            //CHECKSTYLE:OFF
+        } catch (final Exception ex) {
+            //CHECKSTYLE:ON
+            ExecutorExceptionHandler.handleException(ex);
+            return null;
+        }
+        List<O> result = Lists.newLinkedList(restOutputs);
+        result.add(0, firstOutput);
+        return result;
     }
     
     /**
@@ -86,8 +104,8 @@ public final class ExecutorEngine {
         return mergeUnit.merge(execute(inputs, executeUnit));
     }
     
-    private <I, O> ListenableFuture<List<O>> submitFutures(final Collection<I> inputs, final ExecuteUnit<I, O> executeUnit) {
-        Set<ListenableFuture<O>> result = new HashSet<>(inputs.size());
+    private <I, O> ListenableFuture<List<O>> asyncRun(final Collection<I> inputs, final ExecuteUnit<I, O> executeUnit) {
+        List<ListenableFuture<O>> result = new ArrayList<>(inputs.size());
         for (final I each : inputs) {
             result.add(executorService.submit(new Callable<O>() {
                 
@@ -100,25 +118,17 @@ public final class ExecutorEngine {
         return Futures.allAsList(result);
     }
     
-    private <T> void addCallback(final ListenableFuture<T> allFutures) {
-        Futures.addCallback(allFutures, new FutureCallback<T>() {
-            @Override
-            public void onSuccess(final T result) {
-                log.trace("Concurrent execute result success {}", result);
-            }
-            
-            @Override
-            public void onFailure(final Throwable thrown) {
-                log.error("Concurrent execute result error {}", thrown);
-            }
-        });
-    }
-    
-    private <O> O getFutureResults(final ListenableFuture<O> futures) {
+    /**
+     * 安全关闭执行器,并释放线程.
+     */
+    public void shutdown() {
+        executorService.shutdownNow();
         try {
-            return futures.get();
-        } catch (final InterruptedException | ExecutionException ex) {
-            throw new ShardingJdbcException(ex);
+            executorService.awaitTermination(5, TimeUnit.SECONDS);
+        } catch (final InterruptedException ignored) {
+        }
+        if (!executorService.isTerminated()) {
+            throw new ShardingJdbcException("ExecutorEngine can not been terminated");
         }
     }
 }

@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +20,9 @@ package com.dangdang.ddframe.rdb.sharding.config.common.api.config;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * 表规则配置.
  * 
@@ -29,9 +32,15 @@ import lombok.Setter;
 @Setter
 public class TableRuleConfig {
     
+    private boolean dynamic;
+    
     private String actualTables;
+    
+    private String dataSourceNames;
     
     private StrategyConfig databaseStrategy;
     
     private StrategyConfig tableStrategy;
+    
+    private List<AutoIncrementColumnConfig> autoIncrementColumns = new ArrayList<>();
 }

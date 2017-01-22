@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,17 +17,18 @@
 
 package com.dangdang.ddframe.rdb.sharding.config.yaml.api;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.util.Map;
-import javax.sql.DataSource;
-
-import com.dangdang.ddframe.rdb.sharding.api.ShardingDataSource;
 import com.dangdang.ddframe.rdb.sharding.config.common.api.ShardingRuleBuilder;
 import com.dangdang.ddframe.rdb.sharding.config.yaml.internel.YamlConfig;
+import com.dangdang.ddframe.rdb.sharding.jdbc.ShardingDataSource;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
+
+import javax.sql.DataSource;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Map;
 
 /**
  * 基于配置文件的分片规则.
@@ -36,15 +37,20 @@ import org.yaml.snakeyaml.constructor.Constructor;
  */
 public class YamlShardingDataSource extends ShardingDataSource {
     
-    public YamlShardingDataSource(final File yamlFile) throws FileNotFoundException {
-        super(new ShardingRuleBuilder().parse(yamlFile.getName(), parse(yamlFile)).build(), parse(yamlFile).getProps());
+    public YamlShardingDataSource(final File yamlFile) throws IOException {
+        super(new ShardingRuleBuilder(yamlFile.getName(), unmarshal(yamlFile)).build(), unmarshal(yamlFile).getProps());
     }
     
-    public YamlShardingDataSource(final Map<String, DataSource> dataSource, final File yamlFile) throws FileNotFoundException {
-        super(new ShardingRuleBuilder().setDataSourceMap(dataSource).parse(yamlFile.getName(), parse(yamlFile)).build(), parse(yamlFile).getProps());
+    public YamlShardingDataSource(final Map<String, DataSource> dataSource, final File yamlFile) throws IOException {
+        super(new ShardingRuleBuilder(yamlFile.getName(), dataSource, unmarshal(yamlFile)).build(), unmarshal(yamlFile).getProps());
     }
     
-    private static YamlConfig parse(final File yamlFile) throws FileNotFoundException {
-        return (YamlConfig) new Yaml(new Constructor(YamlConfig.class)).load(new FileReader(yamlFile));
+    private static YamlConfig unmarshal(final File yamlFile) throws IOException {
+        try (
+                FileInputStream fileInputStream = new FileInputStream(yamlFile);
+                InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8")
+            ) {
+            return new Yaml(new Constructor(YamlConfig.class)).loadAs(inputStreamReader, YamlConfig.class);
+        }
     }
 }

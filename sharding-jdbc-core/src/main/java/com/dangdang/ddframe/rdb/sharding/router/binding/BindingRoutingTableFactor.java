@@ -1,12 +1,12 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *      http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,15 +17,14 @@
 
 package com.dangdang.ddframe.rdb.sharding.router.binding;
 
-import java.util.ArrayList;
-import java.util.Collection;
-
 import com.dangdang.ddframe.rdb.sharding.parser.result.router.SQLBuilder;
 import com.dangdang.ddframe.rdb.sharding.router.single.SingleRoutingTableFactor;
-
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.ToString;
+
+import java.util.ArrayList;
+import java.util.Collection;
 
 /**
  * Binding表路由表单元.
@@ -43,10 +42,11 @@ final class BindingRoutingTableFactor extends SingleRoutingTableFactor {
     }
     
     @Override
-    public void buildSQL(final SQLBuilder builder) {
-        super.buildSQL(builder);
+    public BindingRoutingTableFactor replaceSQL(final SQLBuilder builder) {
+        super.replaceSQL(builder);
         for (BindingRoutingTableFactor each : bindingRoutingTableFactors) {
-            each.buildSQL(builder);
+            each.replaceSQL(builder);
         }
+        return this;
     }
 }

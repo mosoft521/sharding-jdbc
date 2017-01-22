@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 1999-2015 dangdang.com.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +17,9 @@
 
 package com.dangdang.ddframe.rdb.sharding.spring.datasource;
 
-import com.dangdang.ddframe.rdb.sharding.api.ShardingDataSource;
 import com.dangdang.ddframe.rdb.sharding.config.common.api.ShardingRuleBuilder;
 import com.dangdang.ddframe.rdb.sharding.config.common.api.config.ShardingRuleConfig;
+import com.dangdang.ddframe.rdb.sharding.jdbc.ShardingDataSource;
 
 import java.util.Properties;
 
@@ -31,6 +31,6 @@ import java.util.Properties;
 public class SpringShardingDataSource extends ShardingDataSource {
     
     public SpringShardingDataSource(final ShardingRuleConfig shardingRuleConfig, final Properties props) {
-        super(new ShardingRuleBuilder().parse(shardingRuleConfig).build(), props);
+        super(new ShardingRuleBuilder(shardingRuleConfig).build(), props);
     }
 }
