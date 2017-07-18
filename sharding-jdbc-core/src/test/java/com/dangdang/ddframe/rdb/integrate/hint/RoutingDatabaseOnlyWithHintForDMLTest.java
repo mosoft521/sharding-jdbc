@@ -17,8 +17,8 @@
 
 package com.dangdang.ddframe.rdb.integrate.hint;
 
-import com.dangdang.ddframe.rdb.sharding.jdbc.ShardingDataSource;
-import com.dangdang.ddframe.rdb.sharding.parser.result.router.SQLStatementType;
+import com.dangdang.ddframe.rdb.sharding.jdbc.core.datasource.ShardingDataSource;
+import com.dangdang.ddframe.rdb.sharding.constant.SQLType;
 import org.dbunit.DatabaseUnitException;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,6 +27,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
+import static com.dangdang.ddframe.rdb.integrate.util.SqlPlaceholderUtil.replacePreparedStatement;
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 
@@ -41,11 +42,10 @@ public class RoutingDatabaseOnlyWithHintForDMLTest extends AbstractRoutingDataba
     
     @Test
     public void assertInsertWithAllPlaceholders() throws SQLException, DatabaseUnitException {
-        String sql = "INSERT INTO `t_order` VALUES (?, ?, ?)";
         for (int i = 1; i <= 10; i++) {
             try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
                  Connection connection = shardingDataSource.getConnection();
-                 PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                 PreparedStatement preparedStatement = connection.prepareStatement(getDatabaseTestSQL().getInsertWithAllPlaceholdersSql())) {
                 preparedStatement.setInt(1, i);
                 preparedStatement.setInt(2, i);
                 preparedStatement.setString(3, "insert");
@@ -57,11 +57,10 @@ public class RoutingDatabaseOnlyWithHintForDMLTest extends AbstractRoutingDataba
     
     @Test
     public void assertInsertWithoutPlaceholder() throws SQLException, DatabaseUnitException {
-        String sql = "INSERT INTO `t_order` VALUES (%s, %s, 'insert')";
         for (int i = 1; i <= 10; i++) {
             try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
                  Connection connection = shardingDataSource.getConnection();
-                 PreparedStatement preparedStatement = connection.prepareStatement(String.format(sql, i, i))) {
+                 PreparedStatement preparedStatement = connection.prepareStatement(String.format(getDatabaseTestSQL().getInsertWithoutPlaceholderSql(), i, i))) {
                 preparedStatement.executeUpdate();
             }
         }
@@ -69,26 +68,11 @@ public class RoutingDatabaseOnlyWithHintForDMLTest extends AbstractRoutingDataba
     }
     
     @Test
-    public void assertInsertWithPlaceholdersForShardingKeys() throws SQLException, DatabaseUnitException {
-        String sql = "INSERT INTO `t_order` VALUES (%s, %s, ?)";
+    public void assertInsertWithPartialPlaceholders() throws SQLException, DatabaseUnitException {
         for (int i = 1; i <= 10; i++) {
             try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
                  Connection connection = shardingDataSource.getConnection();
-                 PreparedStatement preparedStatement = connection.prepareStatement(String.format(sql, i, i))) {
-                preparedStatement.setString(1, "insert");
-                preparedStatement.executeUpdate();
-            }
-        }
-        assertDataSet("insert", "insert");
-    }
-    
-    @Test
-    public void assertInsertWithPlaceholdersForNotShardingKeys() throws SQLException, DatabaseUnitException {
-        String sql = "INSERT INTO `t_order` VALUES (%s, %s, ?)";
-        for (int i = 1; i <= 10; i++) {
-            try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
-                 Connection connection = shardingDataSource.getConnection();
-                 PreparedStatement preparedStatement = connection.prepareStatement(String.format(sql, i, i))) {
+                 PreparedStatement preparedStatement = connection.prepareStatement(String.format(getDatabaseTestSQL().getInsertWithPartialPlaceholdersSql(), i, i))) {
                 preparedStatement.setString(1, "insert");
                 preparedStatement.executeUpdate();
             }
@@ -98,12 +82,11 @@ public class RoutingDatabaseOnlyWithHintForDMLTest extends AbstractRoutingDataba
     
     @Test
     public void assertUpdateWithoutAlias() throws SQLException, DatabaseUnitException {
-        String sql = "UPDATE `t_order` SET `status` = ? WHERE `order_id` = ? AND `user_id` = ?";
         for (int i = 10; i < 30; i++) {
             for (int j = 0; j < 2; j++) {
                 try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
                      Connection connection = shardingDataSource.getConnection();
-                     PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                     PreparedStatement preparedStatement = connection.prepareStatement(replacePreparedStatement(getDatabaseTestSQL().getUpdateWithoutAliasSql()))) {
                     preparedStatement.setString(1, "updated");
                     preparedStatement.setInt(2, i * 100 + j);
                     preparedStatement.setInt(3, i);
@@ -116,30 +99,30 @@ public class RoutingDatabaseOnlyWithHintForDMLTest extends AbstractRoutingDataba
     
     @Test
     public void assertUpdateWithAlias() throws SQLException, DatabaseUnitException {
-        String sql = "UPDATE `t_order` AS o SET o.`status` = ? WHERE o.`order_id` = ? AND o.`user_id` = ?";
-        for (int i = 10; i < 30; i++) {
-            for (int j = 0; j < 2; j++) {
-                try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
-                     Connection connection = shardingDataSource.getConnection();
-                     PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
-                    preparedStatement.setString(1, "updated");
-                    preparedStatement.setInt(2, i * 100 + j);
-                    preparedStatement.setInt(3, i);
-                    assertThat(preparedStatement.executeUpdate(), is(1));
+        if (isAliasSupport()) {
+            for (int i = 10; i < 30; i++) {
+                for (int j = 0; j < 2; j++) {
+                    try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
+                         Connection connection = shardingDataSource.getConnection();
+                         PreparedStatement preparedStatement = connection.prepareStatement(getDatabaseTestSQL().getUpdateWithAliasSql())) {
+                        preparedStatement.setString(1, "updated");
+                        preparedStatement.setInt(2, i * 100 + j);
+                        preparedStatement.setInt(3, i);
+                        assertThat(preparedStatement.executeUpdate(), is(1));
+                    }
                 }
             }
+            assertDataSet("update", "updated"); 
         }
-        assertDataSet("update", "updated");
     }
     
     @Test
     public void assertDeleteWithoutAlias() throws SQLException, DatabaseUnitException {
-        String sql = "DELETE `t_order` WHERE `order_id` = ? AND `user_id` = ? AND `status` = ?";
         for (int i = 10; i < 30; i++) {
             for (int j = 0; j < 2; j++) {
                 try (DynamicShardingValueHelper helper = new DynamicDatabaseShardingValueHelper(i);
                      Connection connection = shardingDataSource.getConnection();
-                     PreparedStatement preparedStatement = connection.prepareStatement(sql)) {
+                     PreparedStatement preparedStatement = connection.prepareStatement(replacePreparedStatement(getDatabaseTestSQL().getDeleteWithoutAliasSql()))) {
                     preparedStatement.setInt(1, i * 100 + j);
                     preparedStatement.setInt(2, i);
                     preparedStatement.setString(3, "init");
@@ -153,7 +136,8 @@ public class RoutingDatabaseOnlyWithHintForDMLTest extends AbstractRoutingDataba
     private void assertDataSet(final String expectedDataSetPattern, final String status) throws SQLException, DatabaseUnitException {
         for (int i = 0; i < 10; i++) {
             assertDataSet(String.format("integrate/dataset/db/expect/%s/db_%s.xml", expectedDataSetPattern, i),
-                    shardingDataSource.getConnection().getConnection(String.format("dataSource_db_%s", i), SQLStatementType.SELECT), "t_order", "SELECT * FROM `t_order` WHERE `status`=?", status);
+                    shardingDataSource.getConnection().getConnection(String.format("dataSource_db_%s", i), SQLType.SELECT), 
+                    "t_order", replacePreparedStatement(getDatabaseTestSQL().getAssertSelectWithStatusSql()), status);
         }
     }
 }
