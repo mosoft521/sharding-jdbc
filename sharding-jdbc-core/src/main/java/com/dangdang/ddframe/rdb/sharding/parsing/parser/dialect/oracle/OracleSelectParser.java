@@ -39,7 +39,7 @@ public class OracleSelectParser extends AbstractSelectParser {
             skipForUpdate();
         }
         if (getSelectStatement().getOrderByItems().isEmpty()) {
-            getSelectStatement().getOrderByItems().addAll(parseOrderBy());
+            parseOrderBy();
         }
     }
     
@@ -186,6 +186,7 @@ public class OracleSelectParser extends AbstractSelectParser {
             if (getSqlParser().skipIfEqual(DefaultKeyword.HAVING)) {
                 throw new UnsupportedOperationException("Cannot support Having");
             }
+            getSelectStatement().setGroupByLastPosition(getSqlParser().getLexer().getCurrentToken().getEndPosition());
         }
     }
     
@@ -196,8 +197,9 @@ public class OracleSelectParser extends AbstractSelectParser {
                 throw new UnsupportedOperationException("Cannot support subquery for nested tables.");
             }
             getSelectStatement().setContainStar(false);
+            getSqlParser().skipUselessParentheses();
             parse();
-            getSqlParser().accept(Symbol.RIGHT_PAREN);
+            getSqlParser().skipUselessParentheses();
             if (getSqlParser().equalAny(DefaultKeyword.WHERE, Assist.END)) {
                 return;
             }
@@ -260,15 +262,18 @@ public class OracleSelectParser extends AbstractSelectParser {
     }
     
     private void skipFlashbackQueryClause() {
-        if (getSqlParser().equalAny(OracleKeyword.VERSIONS)) {
+        if (isFlashbackQueryClauseForVersions() || isFlashbackQueryClauseForAs()) {
             throw new UnsupportedOperationException("Cannot support Flashback Query");
-        } else if (getSqlParser().skipIfEqual(DefaultKeyword.AS)) {
-            if (getSqlParser().skipIfEqual(OracleKeyword.OF)) {
-                if (getSqlParser().skipIfEqual(OracleKeyword.SCN) || getSqlParser().skipIfEqual(OracleKeyword.TIMESTAMP)) {
-                    throw new UnsupportedOperationException("Cannot support Flashback Query");
-                }
-            }
         }
+    }
+    
+    private boolean isFlashbackQueryClauseForVersions() {
+        return getSqlParser().skipIfEqual(OracleKeyword.VERSIONS) && getSqlParser().skipIfEqual(DefaultKeyword.BETWEEN);
+    }
+    
+    private boolean isFlashbackQueryClauseForAs() {
+        return getSqlParser().skipIfEqual(DefaultKeyword.AS) && getSqlParser().skipIfEqual(OracleKeyword.OF)
+                && (getSqlParser().skipIfEqual(OracleKeyword.SCN) || getSqlParser().skipIfEqual(OracleKeyword.TIMESTAMP));
     }
     
     private void skipForUpdate() {

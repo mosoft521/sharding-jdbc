@@ -48,6 +48,8 @@ public final class SelectStatement extends AbstractSQLStatement {
     
     private int selectListLastPosition;
     
+    private int groupByLastPosition;
+    
     private final List<SelectItem> items = new LinkedList<>();
     
     private final List<OrderItem> groupByItems = new LinkedList<>();
@@ -90,6 +92,8 @@ public final class SelectStatement extends AbstractSQLStatement {
     
     /**
      * 为选择项设置索引.
+     * 
+     * @param columnLabelIndexMap 列标签索引字典
      */
     public void setIndexForItems(final Map<String, Integer> columnLabelIndexMap) {
         setIndexForAggregationItem(columnLabelIndexMap);
