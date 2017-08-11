@@ -36,7 +36,7 @@ public final class Assert {
     private String id;
     
     @XmlAttribute
-    private String sql;
+    private String parameters;
     
     @XmlElement(name = "tables") 
     private Tables tables;

@@ -275,7 +275,7 @@ props: 属性配置(可选)
 | *名称*                                | *类型*       | *数据类型*  | *必填* | *说明*                              |
 | ------------------------------------ | ------------ | ---------- | ----- | ----------------------------------- |
 | metrics.enable                       | 属性         |  boolean   |   否   | 是否开启度量采集，默认为false不开启     |
-| sql.show                             | 属性         |  boolean   |   是   | 是否开启SQL显示，默认为true开启     |
+| sql.show                             | 属性         |  boolean   |   是   | 是否开启SQL显示，默认为false不开启     |
 | metrics.millisecond.period           | 属性         |  String    |   否   | 度量输出周期，单位为毫秒               |
 | executor.min.idle.size               | 属性         |  int       |   否   | 最小空闲工作线程数量                  |
 | executor.max.size                    | 属性         |  int       |   否   | 最大工作线程数量                      |
@@ -294,9 +294,9 @@ ${[unit1, unit2, unitX]} 表示枚举值
 
 inline表达式中连续多个${...}表达式，整个inline最终的结果将会根据每个子表达式的结果进行笛卡尔组合，例如正式表inline表达式如下：
 ```groovy
-dbtbl_${[online, offline]}_${1..3}
+dbtbl_${['online', 'offline']}_${1..3}
 ```
-最终会解析为dbtbl_online_1，dbtbl_online_2，dbtbl_online_3，dbtbl_offline_1，dbtbl_offline_2和dbtbl_ offline_3这6张表。
+最终会解析为dbtbl_online_1，dbtbl_online_2，dbtbl_online_3，dbtbl_offline_1，dbtbl_offline_2和dbtbl_offline_3这6张表。
 
 ### 字符串内嵌groovy代码
 表达式本质上是一段字符串，字符串中使用${}来嵌入groovy代码。

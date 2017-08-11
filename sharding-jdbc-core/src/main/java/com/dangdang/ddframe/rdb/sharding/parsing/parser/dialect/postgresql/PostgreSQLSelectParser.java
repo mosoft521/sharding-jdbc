@@ -21,40 +21,33 @@ import com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.postgresql.Postgr
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.DefaultKeyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Literals;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Symbol;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.SQLParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.AbstractSQLParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.Limit;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.LimitValue;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingException;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingUnsupportedException;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.select.AbstractSelectParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.AbstractSelectParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.OffsetToken;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.RowCountToken;
 import com.dangdang.ddframe.rdb.sharding.util.NumberUtil;
 import com.google.common.base.Optional;
 
-public class PostgreSQLSelectParser extends AbstractSelectParser {
+/**
+ * PostgreSQL Select语句解析器.
+ *
+ * @author zhangliang
+ */
+public final class PostgreSQLSelectParser extends AbstractSelectParser {
     
-    public PostgreSQLSelectParser(final SQLParser sqlParser) {
+    public PostgreSQLSelectParser(final AbstractSQLParser sqlParser) {
         super(sqlParser);
     }
     
     @Override
-    public void query() {
-        if (getSqlParser().skipIfEqual(DefaultKeyword.SELECT)) {
-            parseDistinct();
-            parseSelectList();
-            if (getSqlParser().skipIfEqual(DefaultKeyword.INTO)) {
-                getSqlParser().skipIfEqual(PostgreSQLKeyword.TEMPORARY, PostgreSQLKeyword.TEMP, PostgreSQLKeyword.UNLOGGED);
-                getSqlParser().skipIfEqual(DefaultKeyword.TABLE);
-            }
-        }
-        parseFrom();
-        parseWhere();
-        parseGroupBy();
+    protected void customizedSelect() {
         if (getSqlParser().equalAny(PostgreSQLKeyword.WINDOW)) {
             throw new SQLParsingUnsupportedException(PostgreSQLKeyword.WINDOW);
         }
-        parseOrderBy();
         parseLimit();
         if (getSqlParser().skipIfEqual(DefaultKeyword.FETCH)) {
             throw new SQLParsingUnsupportedException(DefaultKeyword.FETCH);
@@ -66,7 +59,6 @@ public class PostgreSQLSelectParser extends AbstractSelectParser {
             }
             getSqlParser().skipIfEqual(PostgreSQLKeyword.NOWAIT);
         }
-        queryRest();
     }
     
     private void parseLimit() {
@@ -139,9 +131,5 @@ public class PostgreSQLSelectParser extends AbstractSelectParser {
             limit.setRowCount(rowCount.get());
         }
         getSelectStatement().setLimit(limit);
-    }
-    
-    protected boolean hasDistinctOn() {
-        return true;
     }
 }

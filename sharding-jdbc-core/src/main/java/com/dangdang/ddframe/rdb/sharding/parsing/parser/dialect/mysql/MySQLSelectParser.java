@@ -19,44 +19,50 @@ package com.dangdang.ddframe.rdb.sharding.parsing.parser.dialect.mysql;
 
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.mysql.MySQLKeyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.oracle.OracleKeyword;
-import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Assist;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.DefaultKeyword;
+import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Keyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Literals;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Symbol;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.SQLParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.AbstractSQLParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.Limit;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.LimitValue;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingException;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingUnsupportedException;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.select.AbstractSelectParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.AbstractSelectParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.OffsetToken;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.RowCountToken;
 
-public class MySQLSelectParser extends AbstractSelectParser {
+import java.util.Collection;
+import java.util.Collections;
+
+/**
+ * MySQL Select语句解析器.
+ *
+ * @author zhangliang
+ */
+public final class MySQLSelectParser extends AbstractSelectParser {
     
-    public MySQLSelectParser(final SQLParser sqlParser) {
+    public MySQLSelectParser(final AbstractSQLParser sqlParser) {
         super(sqlParser);
     }
     
     @Override
-    public void query() {
-        if (getSqlParser().equalAny(DefaultKeyword.SELECT)) {
-            getSqlParser().getLexer().nextToken();
-            parseDistinct();
-            getSqlParser().skipAll(MySQLKeyword.HIGH_PRIORITY, DefaultKeyword.STRAIGHT_JOIN, MySQLKeyword.SQL_SMALL_RESULT, MySQLKeyword.SQL_BIG_RESULT, MySQLKeyword.SQL_BUFFER_RESULT,
-                    MySQLKeyword.SQL_CACHE, MySQLKeyword.SQL_NO_CACHE, MySQLKeyword.SQL_CALC_FOUND_ROWS);
-            parseSelectList();
-            skipToFrom();
-        }
-        parseFrom();
-        parseWhere();
-        parseGroupBy();
-        parseOrderBy();
+    protected Collection<Keyword> getCustomizedDistinctKeywords() {
+        return Collections.<Keyword>singletonList(MySQLKeyword.DISTINCTROW);
+    }
+    
+    @Override
+    protected void parseBeforeSelectList() {
+        getSqlParser().skipAll(MySQLKeyword.HIGH_PRIORITY, DefaultKeyword.STRAIGHT_JOIN, MySQLKeyword.SQL_SMALL_RESULT, MySQLKeyword.SQL_BIG_RESULT, MySQLKeyword.SQL_BUFFER_RESULT, 
+                MySQLKeyword.SQL_CACHE, MySQLKeyword.SQL_NO_CACHE, MySQLKeyword.SQL_CALC_FOUND_ROWS);
+    }
+    
+    @Override
+    protected void customizedSelect() {
         parseLimit();
         if (getSqlParser().equalAny(DefaultKeyword.PROCEDURE)) {
             throw new SQLParsingUnsupportedException(getSqlParser().getLexer().getCurrentToken().getType());
         }
-        queryRest();
     }
     
     private void parseLimit() {
@@ -150,12 +156,6 @@ public class MySQLSelectParser extends AbstractSelectParser {
         result.setRowCount(new LimitValue(value, index));
         result.setOffset(new LimitValue(offsetValue, offsetIndex));
         return result;
-    }
-    
-    private void skipToFrom() {
-        while (!getSqlParser().equalAny(DefaultKeyword.FROM) && !getSqlParser().equalAny(Assist.END)) {
-            getSqlParser().getLexer().nextToken();
-        }
     }
     
     @Override

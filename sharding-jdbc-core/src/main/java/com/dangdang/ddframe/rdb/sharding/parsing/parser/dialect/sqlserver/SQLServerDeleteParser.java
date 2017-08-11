@@ -19,9 +19,9 @@ package com.dangdang.ddframe.rdb.sharding.parsing.parser.dialect.sqlserver;
 
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.sqlserver.SQLServerKeyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.DefaultKeyword;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.SQLParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.AbstractSQLParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingUnsupportedException;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.delete.AbstractDeleteParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dml.delete.AbstractDeleteParser;
 
 /**
  * SQLServer Delete语句解析器.
@@ -30,7 +30,7 @@ import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.delete.Abstrac
  */
 public final class SQLServerDeleteParser extends AbstractDeleteParser {
     
-    public SQLServerDeleteParser(final SQLParser sqlParser) {
+    public SQLServerDeleteParser(final AbstractSQLParser sqlParser) {
         super(sqlParser);
     }
     

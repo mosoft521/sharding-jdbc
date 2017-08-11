@@ -38,7 +38,6 @@ public enum DefaultKeyword implements Keyword {
     REVOKE,
     AS,
     DISTINCT,
-    DISTINCTROW,
     MAX,
     MIN,
     SUM,
@@ -137,5 +136,9 @@ public enum DefaultKeyword implements Keyword {
     MINUS,
     USER,
     PASSWORD,
-    CONNECT_BY_ROOT
+    CONNECT_BY_ROOT,
+    IF,
+    GLOBAL,
+    LOCAL, 
+    TEMPORARY
 }

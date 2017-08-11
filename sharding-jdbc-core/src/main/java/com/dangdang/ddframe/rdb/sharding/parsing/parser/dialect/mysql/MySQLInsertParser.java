@@ -24,7 +24,7 @@ import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.DefaultKeyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Literals;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Symbol;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.TokenType;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.SQLParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.AbstractSQLParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.condition.Column;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.condition.Condition;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLExpression;
@@ -32,7 +32,7 @@ import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLIgnoreExpr
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLNumberExpression;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLPlaceholderExpression;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLTextExpression;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.insert.AbstractInsertParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dml.insert.AbstractInsertParser;
 import com.dangdang.ddframe.rdb.sharding.util.SQLUtil;
 import com.google.common.collect.Sets;
 
@@ -45,7 +45,7 @@ import java.util.Set;
  */
 public final class MySQLInsertParser extends AbstractInsertParser {
     
-    public MySQLInsertParser(final ShardingRule shardingRule, final SQLParser sqlParser) {
+    public MySQLInsertParser(final ShardingRule shardingRule, final AbstractSQLParser sqlParser) {
         super(shardingRule, sqlParser);
     }
     
@@ -68,7 +68,7 @@ public final class MySQLInsertParser extends AbstractInsertParser {
             } else if (getSqlParser().equalAny(Literals.CHARS)) {
                 sqlExpression = new SQLTextExpression(getSqlParser().getLexer().getCurrentToken().getLiterals());
             } else if (getSqlParser().equalAny(DefaultKeyword.NULL)) {
-                sqlExpression = new SQLIgnoreExpression();
+                sqlExpression = new SQLIgnoreExpression(DefaultKeyword.NULL.name());
             } else if (getSqlParser().equalAny(Symbol.QUESTION)) {
                 sqlExpression = new SQLPlaceholderExpression(getSqlParser().getParametersIndex());
                 getSqlParser().increaseParametersIndex();

@@ -18,51 +18,35 @@
 package com.dangdang.ddframe.rdb.sharding.parsing.parser.dialect.oracle;
 
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.oracle.OracleKeyword;
-import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Assist;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.DefaultKeyword;
+import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Keyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Symbol;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.SQLParser;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.OrderItem;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.AbstractSQLParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingUnsupportedException;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.select.AbstractSelectParser;
-import com.google.common.base.Optional;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.AbstractSelectParser;
 
-public class OracleSelectParser extends AbstractSelectParser {
+import java.util.Collection;
+import java.util.Collections;
+
+/**
+ * Oracle Select语句解析器.
+ *
+ * @author zhangliang
+ */
+public final class OracleSelectParser extends AbstractSelectParser {
     
-    public OracleSelectParser(final SQLParser sqlParser) {
+    public OracleSelectParser(final AbstractSQLParser sqlParser) {
         super(sqlParser);
     }
     
     @Override
-    protected void customizedSelect() {
-        if (getSqlParser().equalAny(DefaultKeyword.FOR)) {
-            skipForUpdate();
-        }
-        if (getSelectStatement().getOrderByItems().isEmpty()) {
-            parseOrderBy();
-        }
+    protected Collection<Keyword> getCustomizedDistinctKeywords() {
+        return Collections.<Keyword>singletonList(DefaultKeyword.UNIQUE);
     }
     
     @Override
-    public void query() {
-        if (getSqlParser().equalAny(DefaultKeyword.SELECT)) {
-            getSqlParser().getLexer().nextToken();
-            parseDistinct();
-            parseSelectList();
-        }
-        skipInto();
-        parseFrom();
-        parseWhere();
+    protected void customizedBetweenWhereAndGroupBy() {
         skipHierarchicalQueryClause();
-        parseGroupBy();
-        skipModelClause();
-        queryRest();
-    }
-    
-    private void skipInto() {
-        if (getSqlParser().equalAny(DefaultKeyword.INTO)) {
-            throw new SQLParsingUnsupportedException(getSqlParser().getLexer().getCurrentToken().getType());
-        }
     }
     
     private void skipHierarchicalQueryClause() {
@@ -87,6 +71,11 @@ public class OracleSelectParser extends AbstractSelectParser {
             }
             getSqlParser().parseComparisonCondition(getSelectStatement());
         }
+    }
+    
+    @Override
+    protected void customizedBetweenGroupByAndOrderBy() {
+        skipModelClause();
     }
     
     private void skipModelClause() {
@@ -133,7 +122,7 @@ public class OracleSelectParser extends AbstractSelectParser {
         skipCellReferenceOptions();
         skipModelRulesClause();
     }
-
+    
     private void skipModelRulesClause() {
         if (getSqlParser().skipIfEqual(OracleKeyword.RULES)) {
             getSqlParser().skipIfEqual(DefaultKeyword.UPDATE);
@@ -163,9 +152,19 @@ public class OracleSelectParser extends AbstractSelectParser {
             }
         }
     }
-
+    
     private void skipModelColumnClause() {
         throw new SQLParsingUnsupportedException(getSqlParser().getLexer().getCurrentToken().getType());
+    }
+    
+    @Override
+    protected void customizedSelect() {
+        if (getSqlParser().equalAny(DefaultKeyword.FOR)) {
+            skipForUpdate();
+        }
+        if (getSelectStatement().getOrderByItems().isEmpty()) {
+            parseOrderBy();
+        }
     }
     
     @Override
@@ -186,24 +185,12 @@ public class OracleSelectParser extends AbstractSelectParser {
             if (getSqlParser().skipIfEqual(DefaultKeyword.HAVING)) {
                 throw new UnsupportedOperationException("Cannot support Having");
             }
-            getSelectStatement().setGroupByLastPosition(getSqlParser().getLexer().getCurrentToken().getEndPosition());
+            getSelectStatement().setGroupByLastPosition(getSqlParser().getLexer().getCurrentToken().getEndPosition() - getSqlParser().getLexer().getCurrentToken().getLiterals().length());
         }
     }
     
     @Override
-    public final void parseTable() {
-        if (getSqlParser().skipIfEqual(Symbol.LEFT_PAREN)) {
-            if (!getSelectStatement().getTables().isEmpty()) {
-                throw new UnsupportedOperationException("Cannot support subquery for nested tables.");
-            }
-            getSelectStatement().setContainStar(false);
-            getSqlParser().skipUselessParentheses();
-            parse();
-            getSqlParser().skipUselessParentheses();
-            if (getSqlParser().equalAny(DefaultKeyword.WHERE, Assist.END)) {
-                return;
-            }
-        }
+    protected void customizedParseTableFactor() {
         if (getSqlParser().skipIfEqual(OracleKeyword.ONLY)) {
             getSqlParser().skipIfEqual(Symbol.LEFT_PAREN);
             parseQueryTableExpression();
@@ -214,7 +201,6 @@ public class OracleSelectParser extends AbstractSelectParser {
             skipPivotClause();
             skipFlashbackQueryClause();
         }
-        parseJoinTable();
     }
     
     private void parseQueryTableExpression() {
@@ -292,13 +278,7 @@ public class OracleSelectParser extends AbstractSelectParser {
     }
     
     @Override
-    protected Optional<OrderItem> parseSelectOrderByItem() {
-        Optional<OrderItem> result = super.parseSelectOrderByItem();
-        skipAfterOrderByItem();
-        return result;
-    }
-    
-    private void skipAfterOrderByItem() {
+    protected void skipAfterOrderByItem() {
         if (getSqlParser().skipIfEqual(OracleKeyword.NULLS)) {
             getSqlParser().getLexer().nextToken();
             if (!getSqlParser().skipIfEqual(OracleKeyword.FIRST, OracleKeyword.LAST)) {

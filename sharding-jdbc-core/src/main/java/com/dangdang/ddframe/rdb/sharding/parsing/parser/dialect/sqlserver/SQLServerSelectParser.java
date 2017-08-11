@@ -21,7 +21,7 @@ import com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.sqlserver.SQLServ
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.DefaultKeyword;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Literals;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Symbol;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.SQLParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.AbstractSQLParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.Limit;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.LimitValue;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.selectitem.CommonSelectItem;
@@ -31,30 +31,24 @@ import com.dangdang.ddframe.rdb.sharding.parsing.parser.exception.SQLParsingUnsu
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLExpression;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLNumberExpression;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.expression.SQLPlaceholderExpression;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.select.AbstractSelectParser;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.AbstractSelectParser;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.RowCountToken;
 import com.google.common.base.Optional;
 
-public class SQLServerSelectParser extends AbstractSelectParser {
+/**
+ * SQLServer Select语句解析器.
+ *
+ * @author zhangliang
+ */
+public final class SQLServerSelectParser extends AbstractSelectParser {
     
-    public SQLServerSelectParser(final SQLParser sqlParser) {
+    public SQLServerSelectParser(final AbstractSQLParser sqlParser) {
         super(sqlParser);
     }
     
     @Override
-    public void query() {
-        if (getSqlParser().skipIfEqual(DefaultKeyword.SELECT)) {
-            parseDistinct();
-            parseTop();
-            parseSelectList();
-        }
-        if (getSqlParser().equalAny(DefaultKeyword.INTO)) {
-            throw new SQLParsingUnsupportedException(getSqlParser().getLexer().getCurrentToken().getType());
-        }
-        parseFrom();
-        parseWhere();
-        parseGroupBy();
-        queryRest();
+    protected void parseBeforeSelectList() {
+        parseTop();
     }
     
     private void parseTop() {
@@ -77,9 +71,10 @@ public class SQLServerSelectParser extends AbstractSelectParser {
         } else {
             throw new SQLParsingException(getSqlParser().getLexer());
         }
-        if (getSqlParser().skipIfEqual(SQLServerKeyword.PERCENT)) {
-            return;
+        if (getSqlParser().equalAny(SQLServerKeyword.PERCENT)) {
+            throw new SQLParsingUnsupportedException(SQLServerKeyword.PERCENT);
         }
+        getSqlParser().skipIfEqual(DefaultKeyword.WITH, SQLServerKeyword.TIES);
         if (null == getSelectStatement().getLimit()) {
             Limit limit = new Limit(false);
             limit.setRowCount(rowCountValue);
@@ -98,6 +93,7 @@ public class SQLServerSelectParser extends AbstractSelectParser {
     protected SelectItem parseRowNumberSelectItem() {
         getSqlParser().getLexer().nextToken();
         if (getSqlParser().equalAny(Symbol.LEFT_PAREN)) {
+            setInSubQuery(false);
             getSqlParser().skipUntil(DefaultKeyword.OVER);
             getSqlParser().getLexer().nextToken();
             getSqlParser().skipIfEqual(Symbol.LEFT_PAREN);
