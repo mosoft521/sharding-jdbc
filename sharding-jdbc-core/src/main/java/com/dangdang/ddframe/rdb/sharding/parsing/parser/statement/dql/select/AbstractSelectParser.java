@@ -78,7 +78,9 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
     private int parametersIndex;
     
     @Setter
-    private boolean isInSubQuery;
+    private boolean containSubquery;
+    
+    private boolean containStarForOutQuery;
     
     private boolean appendDerivedColumnsFlag;
     
@@ -123,23 +125,21 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
     protected void parseBeforeSelectList() {
     }
     
-    protected final void parseSelectList() {
+    private void parseSelectList() {
         do {
             parseSelectItem();
         } while (sqlParser.skipIfEqual(Symbol.COMMA));
-        if (0 == selectStatement.getSelectListLastPosition()) {
-            selectStatement.setSelectListLastPosition(sqlParser.getLexer().getCurrentToken().getEndPosition() - sqlParser.getLexer().getCurrentToken().getLiterals().length());
-        }
+        selectStatement.setSelectListLastPosition(sqlParser.getLexer().getCurrentToken().getEndPosition() - sqlParser.getLexer().getCurrentToken().getLiterals().length());
     }
     
     private void parseSelectItem() {
+        sqlParser.skipIfEqual(getSkipKeywordsBeforeSelectItem());
         if (isRowNumberSelectItem()) {
             selectStatement.getItems().add(parseRowNumberSelectItem());
             return;
         }
-        sqlParser.skipIfEqual(DefaultKeyword.CONNECT_BY_ROOT);
         String literals = sqlParser.getLexer().getCurrentToken().getLiterals();
-        if (isStarSelectItem(literals)) {
+        if (Symbol.STAR.getLiterals().equals(SQLUtil.getExactlyValue(literals))) {
             selectStatement.getItems().add(parseStarSelectItem());
             return;
         }
@@ -166,6 +166,10 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
         selectStatement.getItems().add(new CommonSelectItem(SQLUtil.getExactlyValue(expression.toString()), sqlParser.parseAlias()));
     }
     
+    protected Keyword[] getSkipKeywordsBeforeSelectItem() {
+        return new Keyword[0];
+    }
+    
     protected boolean isRowNumberSelectItem() {
         return false;
     }
@@ -174,11 +178,10 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
         throw new UnsupportedOperationException("Cannot support special select item.");
     }
     
-    private boolean isStarSelectItem(final String literals) {
-        return sqlParser.equalAny(Symbol.STAR) || Symbol.STAR.getLiterals().equals(SQLUtil.getExactlyValue(literals));
-    }
-    
     private SelectItem parseStarSelectItem() {
+        if (!containSubquery) {
+            containStarForOutQuery = true;
+        }
         sqlParser.getLexer().nextToken();
         selectStatement.setContainStar(true);
         return new CommonSelectItem(Symbol.STAR.getLiterals(), sqlParser.parseAlias());
@@ -227,7 +230,7 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
         sqlParser.accept(DefaultKeyword.BY);
         do {
             OrderItem orderItem = parseSelectOrderByItem();
-            if (!isInSubQuery) {
+            if (!containSubquery || containStarForOutQuery) {
                 result.add(orderItem);
             }
         }
@@ -306,7 +309,7 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
         } else {
             return;
         }
-        if (!isInSubQuery) {
+        if (!containSubquery || containStarForOutQuery) {
             selectStatement.getGroupByItems().add(orderItem);
         }
     }
@@ -341,7 +344,7 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
             if (!selectStatement.getTables().isEmpty()) {
                 throw new UnsupportedOperationException("Cannot support subquery for nested tables.");
             }
-            isInSubQuery = true;
+            containSubquery = true;
             selectStatement.setContainStar(false);
             sqlParser.skipUselessParentheses();
             parse();
@@ -350,7 +353,6 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
                 return;
             }
         }
-        isInSubQuery = false;
         customizedParseTableFactor();
         parseJoinTable();
     }
@@ -360,8 +362,8 @@ public abstract class AbstractSelectParser implements SQLStatementParser {
     }
     
     protected final void parseTableFactor() {
-        final int beginPosition = sqlParser.getLexer().getCurrentToken().getEndPosition() - sqlParser.getLexer().getCurrentToken().getLiterals().length();
         sqlParser.skipAll(DefaultKeyword.AS);
+        final int beginPosition = sqlParser.getLexer().getCurrentToken().getEndPosition() - sqlParser.getLexer().getCurrentToken().getLiterals().length();
         String literals = sqlParser.getLexer().getCurrentToken().getLiterals();
         sqlParser.getLexer().nextToken();
         // TODO 包含Schema解析
