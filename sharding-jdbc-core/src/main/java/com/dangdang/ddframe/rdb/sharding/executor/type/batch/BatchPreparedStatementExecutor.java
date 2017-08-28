@@ -18,6 +18,7 @@
 package com.dangdang.ddframe.rdb.sharding.executor.type.batch;
 
 import com.codahale.metrics.Timer.Context;
+import com.dangdang.ddframe.rdb.sharding.constant.DatabaseType;
 import com.dangdang.ddframe.rdb.sharding.constant.SQLType;
 import com.dangdang.ddframe.rdb.sharding.executor.BaseStatementUnit;
 import com.dangdang.ddframe.rdb.sharding.executor.ExecuteCallback;
@@ -30,7 +31,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 多线程执行批量预编译语句对象请求的执行器.
+ * PreparedStatement Executor for  multiple threads to process add batch.
  * 
  * @author zhangliang
  */
@@ -39,6 +40,8 @@ public final class BatchPreparedStatementExecutor {
     
     private final ExecutorEngine executorEngine;
     
+    private final DatabaseType dbType;
+    
     private final SQLType sqlType;
     
     private final Collection<BatchPreparedStatementUnit> batchPreparedStatementUnits;
@@ -46,9 +49,9 @@ public final class BatchPreparedStatementExecutor {
     private final List<List<Object>> parameterSets;
     
     /**
-     * 执行批量SQL.
+     * Execute batch.
      * 
-     * @return 执行结果
+     * @return execute results
      */
     public int[] executeBatch() {
         Context context = MetricsContext.start("ShardingPreparedStatement-executeBatch");
@@ -70,7 +73,12 @@ public final class BatchPreparedStatementExecutor {
         int count = 0;
         for (BatchPreparedStatementUnit each : batchPreparedStatementUnits) {
             for (Map.Entry<Integer, Integer> entry : each.getJdbcAndActualAddBatchCallTimesMap().entrySet()) {
-                result[entry.getKey()] += null == results.get(count) ? 0 : results.get(count)[entry.getValue()];
+                int value = null == results.get(count) ? 0 : results.get(count)[entry.getValue()];
+                if (DatabaseType.Oracle == dbType) {
+                    result[entry.getKey()] = value;
+                } else {
+                    result[entry.getKey()] += value;
+                }
             }
             count++;
         }

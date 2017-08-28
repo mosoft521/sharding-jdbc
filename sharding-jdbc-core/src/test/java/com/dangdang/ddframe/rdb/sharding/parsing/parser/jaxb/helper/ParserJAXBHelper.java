@@ -9,7 +9,7 @@ import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.table.Tables;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Assert;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.GroupByColumn;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.OrderByColumn;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.SelectStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dql.select.SelectStatement;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Strings;
@@ -19,19 +19,19 @@ import java.util.List;
 
 public class ParserJAXBHelper {
     
-    public static String[] getParameters(final Assert assertObj) {
-        if (null == assertObj.getParameters()) {
+    public static String[] getParameters(final String parameters) {
+        if (Strings.isNullOrEmpty(parameters)) {
             return new String[]{};
         }
-        return assertObj.getParameters().split(",");
+        return parameters.split(",");
     }
     
-    public static Tables getTables(final Assert assertObj) {
+    public static Tables getTables(final com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Tables tables) {
         Tables result = new Tables();
-        if (null == assertObj.getTables()) {
+        if (null == tables) {
             return result;
         }
-        for (com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Table each : assertObj.getTables().getTables()) {
+        for (com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Table each : tables.getTables()) {
             Table table = new Table(each.getName(), Optional.fromNullable(each.getAlias()));
             result.add(table);
         }
@@ -46,12 +46,15 @@ public class ParserJAXBHelper {
                 @Override
                 public OrderItem apply(final OrderByColumn input) {
                     if (Strings.isNullOrEmpty(input.getName())) {
-                        return new OrderItem(input.getIndex(), OrderType.valueOf(input.getOrderByType().toUpperCase()));
+                        // TODO nullOrderType should config in xml
+                        return new OrderItem(input.getIndex(), OrderType.valueOf(input.getOrderByType().toUpperCase()), OrderType.ASC);
                     }
                     if (Strings.isNullOrEmpty(input.getOwner())) {
-                        return new OrderItem(input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), Optional.fromNullable(input.getAlias()));
+                        // TODO nullOrderType should config in xml
+                        return new OrderItem(input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), OrderType.ASC, Optional.fromNullable(input.getAlias()));
                     }
-                    return new OrderItem(input.getOwner(), input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), Optional.fromNullable(input.getAlias()));
+                    // TODO nullOrderType should config in xml
+                    return new OrderItem(input.getOwner(), input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), OrderType.ASC, Optional.fromNullable(input.getAlias()));
                 }
             });
             result.getOrderByItems().addAll(orderItems);
@@ -62,9 +65,11 @@ public class ParserJAXBHelper {
                 @Override
                 public OrderItem apply(final GroupByColumn input) {
                     if (null == input.getOwner()) {
-                        return new OrderItem(input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), Optional.fromNullable(input.getAlias()));
+                        // TODO nullOrderType should config in xml
+                        return new OrderItem(input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), OrderType.ASC, Optional.fromNullable(input.getAlias()));
                     }
-                    return new OrderItem(input.getOwner(), input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), Optional.fromNullable(input.getAlias()));
+                    // TODO nullOrderType should config in xml
+                    return new OrderItem(input.getOwner(), input.getName(), OrderType.valueOf(input.getOrderByType().toUpperCase()), OrderType.ASC, Optional.fromNullable(input.getAlias()));
                 }
             }));
         }

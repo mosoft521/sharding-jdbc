@@ -22,7 +22,7 @@ import com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule;
 import com.dangdang.ddframe.rdb.sharding.jdbc.core.ShardingContext;
 import com.dangdang.ddframe.rdb.sharding.metrics.MetricsContext;
 import com.dangdang.ddframe.rdb.sharding.parsing.SQLJudgeEngine;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.SQLStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.SQLStatement;
 import com.dangdang.ddframe.rdb.sharding.routing.SQLExecutionUnit;
 import com.dangdang.ddframe.rdb.sharding.routing.SQLRouteResult;
 import com.dangdang.ddframe.rdb.sharding.routing.type.RoutingResult;
@@ -33,7 +33,7 @@ import com.dangdang.ddframe.rdb.sharding.util.SQLLogger;
 import java.util.List;
 
 /**
- * 通过提示且仅路由至数据库的SQL路由器.
+ * SQL router for hint database only.
  * 
  * @author zhangiang
  */
@@ -54,7 +54,7 @@ public final class DatabaseHintSQLRouter implements SQLRouter {
     }
     
     @Override
-    // TODO insert的SQL仍然需要解析自增主键
+    // TODO insert SQL need parse gen key
     public SQLRouteResult route(final String logicSQL, final List<Object> parameters, final SQLStatement sqlStatement) {
         Context context = MetricsContext.start("Route SQL");
         SQLRouteResult result = new SQLRouteResult(sqlStatement);

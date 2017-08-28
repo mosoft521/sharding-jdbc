@@ -20,7 +20,7 @@ package com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.sqlserver;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Keyword;
 
 /**
- * SQLServer词法关键词.
+ * SQLServer keyword.
  * 
  * @author zhangliang 
  */
@@ -29,9 +29,10 @@ public enum SQLServerKeyword implements Keyword {
     TOP, 
     TIES, 
     OFFSET, 
-    PERCENT, 
+    PERCENT,
+    ROW_NUMBER,
+    PARTITION, 
     ONLY, 
-    IF, 
     OUTPUT, 
     AUTO, 
     BEGIN, 
@@ -42,5 +43,10 @@ public enum SQLServerKeyword implements Keyword {
     XML, 
     XSINIL, 
     XMLSCHEMA, 
-    TYP
+    TYP,
+    TABLESAMPLE,
+    APPLY,
+    REDUCE,
+    REPLICATE,
+    REDISTRIBUTE
 }

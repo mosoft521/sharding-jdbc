@@ -13,7 +13,6 @@ import javax.xml.bind.JAXBException;
 import java.io.File;
 import java.net.URL;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -47,18 +46,25 @@ public final class SQLStatementHelper {
         }
         for (File each : files) {
             if (each.isDirectory()) {
-                continue;
-            }
-            try {
-                SQLStatements statements = (SQLStatements) JAXBContext.newInstance(SQLStatements.class).createUnmarshaller().unmarshal(each);
-                for (SQLStatement statement : statements.getSqls()) {
-                    result.put(statement.getId(), statement);
+                for (File file : each.listFiles()) {
+                    fillStatementMap(result, file);
                 }
-            } catch (final JAXBException ex) {
-                throw new RuntimeException(ex);
+            } else {
+                fillStatementMap(result, each);
             }
         }
         return result;
+    }
+    
+    private static void fillStatementMap(final Map<String, SQLStatement> result, final File each) {
+        try {
+            SQLStatements statements = (SQLStatements) JAXBContext.newInstance(SQLStatements.class).createUnmarshaller().unmarshal(each);
+            for (SQLStatement statement : statements.getSqls()) {
+                result.put(statement.getId(), statement);
+            }
+        } catch (final JAXBException ex) {
+            throw new RuntimeException(ex);
+        }
     }
     
     public static Collection<SQLStatement> getUnsupportedSqlStatements() {
@@ -66,13 +72,13 @@ public final class SQLStatementHelper {
     }
     
     public static String getSql(final String sqlId) {
-        return STATEMENT_MAP.get(sqlId).getSql();
+        checkSqlId(sqlId);
+        SQLStatement statement = STATEMENT_MAP.get(sqlId);
+        return statement.getSql();
     }
     
     public static Set<DatabaseType> getTypes(final String sqlId) {
-        if (null == sqlId || !STATEMENT_MAP.containsKey(sqlId)) {
-            return Collections.emptySet();
-        }
+        checkSqlId(sqlId);
         SQLStatement statement = STATEMENT_MAP.get(sqlId);
         if (null == statement.getTypes()) {
             return Sets.newHashSet(DatabaseType.values());
@@ -82,5 +88,11 @@ public final class SQLStatementHelper {
             result.add(DatabaseType.valueOf(each));
         }
         return result;
+    }
+    
+    private static void checkSqlId(final String sqlId) {
+        if (null == sqlId || !STATEMENT_MAP.containsKey(sqlId)) {
+            throw new RuntimeException("Can't find sql of id:" + sqlId);
+        }
     }
 }

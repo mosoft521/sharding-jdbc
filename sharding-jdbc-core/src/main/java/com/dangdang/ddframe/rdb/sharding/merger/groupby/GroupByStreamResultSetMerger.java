@@ -17,12 +17,11 @@
 
 package com.dangdang.ddframe.rdb.sharding.merger.groupby;
 
-import com.dangdang.ddframe.rdb.sharding.constant.OrderType;
 import com.dangdang.ddframe.rdb.sharding.merger.groupby.aggregation.AggregationUnit;
 import com.dangdang.ddframe.rdb.sharding.merger.groupby.aggregation.AggregationUnitFactory;
 import com.dangdang.ddframe.rdb.sharding.merger.orderby.OrderByStreamResultSetMerger;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.selectitem.AggregationSelectItem;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.SelectStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dql.select.SelectStatement;
 import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -37,7 +36,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 /**
- * 流式分组归并结果集接口.
+ * Stream merger for group by.
  *
  * @author zhangliang
  */
@@ -52,8 +51,8 @@ public final class GroupByStreamResultSetMerger extends OrderByStreamResultSetMe
     private List<?> currentGroupByValues;
     
     public GroupByStreamResultSetMerger(
-            final Map<String, Integer> labelAndIndexMap, final List<ResultSet> resultSets, final SelectStatement selectStatement, final OrderType nullOrderType) throws SQLException {
-        super(resultSets, selectStatement.getOrderByItems(), nullOrderType);
+            final Map<String, Integer> labelAndIndexMap, final List<ResultSet> resultSets, final SelectStatement selectStatement) throws SQLException {
+        super(resultSets, selectStatement.getOrderByItems());
         this.labelAndIndexMap = labelAndIndexMap;
         this.selectStatement = selectStatement;
         currentRow = new ArrayList<>(labelAndIndexMap.size());

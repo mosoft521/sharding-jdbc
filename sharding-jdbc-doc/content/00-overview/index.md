@@ -31,7 +31,7 @@ Sharding-JDBC完整的实现了分库分表，读写分离和分布式主键功�
 # 功能列表
 
 ## 1. 分库分表
-* SQL解析功能完善，支持聚合，分组，排序，LIMIT，OR等查询，并且支持级联表以及笛卡尔积的表查询
+* SQL解析功能完善，支持聚合，分组，排序，LIMIT，TOP等查询，并且支持级联表以及笛卡尔积的表查询
 * 支持内、外连接查询
 * 分片策略灵活，可支持=，BETWEEN，IN等多维度分片，也可支持多分片键共用，以及自定义分片策略
 * 基于Hint的强制分库分表路由
@@ -89,6 +89,8 @@ Sharding-JDBC完整的实现了分库分表，读写分离和分布式主键功�
 
 ## [非凡之星](http://www.ffzxnet.com/)
 
+## [凤凰汽车](http://auto.ifeng.com/)
+
 ## [欢聚时代YY](http://www.yy.com/)
 
 ## [家视天下](http://www.hiveview.com/)
@@ -103,6 +105,8 @@ Sharding-JDBC完整的实现了分库分表，读写分离和分布式主键功�
 
 ## [搜好货](http://www.912688.com/)
 
+## [搜狐资讯] (http://ss.sohu.com/)
+
 ## [TCL](http://www.tcl.com/)
 
 ## [特微智能](http://www.trawe.cn/)
@@ -110,6 +114,8 @@ Sharding-JDBC完整的实现了分库分表，读写分离和分布式主键功�
 ## [唯品会](http://www.vip.com/)
 
 ## [小牛在线](https://www.xiaoniu88.com/)
+
+## [义乌购] (http://www.yiwugou.com/)
 
 ## [御馔企业](http://www.uzengroup.com/)
 

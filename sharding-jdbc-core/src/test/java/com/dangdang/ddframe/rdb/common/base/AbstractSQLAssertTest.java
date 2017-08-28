@@ -17,23 +17,25 @@
 
 package com.dangdang.ddframe.rdb.common.base;
 
+import com.dangdang.ddframe.rdb.common.env.DatabaseEnvironment;
+import com.dangdang.ddframe.rdb.common.env.ShardingTestStrategy;
+import com.dangdang.ddframe.rdb.common.util.DBUnitUtil;
 import com.dangdang.ddframe.rdb.integrate.jaxb.SQLAssertData;
 import com.dangdang.ddframe.rdb.integrate.jaxb.SQLShardingRule;
 import com.dangdang.ddframe.rdb.integrate.jaxb.helper.SQLAssertJAXBHelper;
-import com.dangdang.ddframe.rdb.common.env.ShardingTestStrategy;
-import com.dangdang.ddframe.rdb.common.util.DBUnitUtil;
-import com.dangdang.ddframe.rdb.common.env.DataBaseEnvironment;
 import com.dangdang.ddframe.rdb.sharding.constant.DatabaseType;
 import com.dangdang.ddframe.rdb.sharding.constant.SQLType;
 import com.dangdang.ddframe.rdb.sharding.jdbc.core.datasource.ShardingDataSource;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import lombok.Getter;
 import org.dbunit.DatabaseUnitException;
 import org.dbunit.dataset.ITable;
 import org.dbunit.dataset.ITableIterator;
 import org.dbunit.dataset.ReplacementDataSet;
 import org.dbunit.dataset.xml.FlatXmlDataSetBuilder;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import java.io.File;
@@ -47,29 +49,38 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static com.dangdang.ddframe.rdb.common.util.SqlPlaceholderUtil.replacePreparedStatement;
 import static com.dangdang.ddframe.rdb.common.util.SqlPlaceholderUtil.replaceStatement;
 import static org.dbunit.Assertion.assertEquals;
 
+@RunWith(Parameterized.class)
 public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
     
+    private final String testCaseName;
+    
+    @Getter
     private final String sql;
     
-    private final Set<DatabaseType> types;
+    private final DatabaseType type;
     
     private final List<SQLShardingRule> shardingRules;
     
-    protected AbstractSQLAssertTest(final String testCaseName, final String sql, final Set<DatabaseType> types, final List<SQLShardingRule> shardingRules) {
+    protected AbstractSQLAssertTest(final String testCaseName, final String sql, final DatabaseType type, final List<SQLShardingRule> shardingRules) {
+        this.testCaseName = testCaseName;
         this.sql = sql;
-        this.types = types;
+        this.type = type;
         this.shardingRules = shardingRules;
     }
     
-    @Parameterized.Parameters(name = "{0}")
+    @Parameterized.Parameters(name = "{0}In{2}")
     public static Collection<Object[]> dataParameters() {
         return SQLAssertJAXBHelper.getDataParameters("integrate/assert");
+    }
+    
+    @Override
+    public DatabaseType getCurrentDatabaseType() {
+        return type;
     }
     
     protected abstract ShardingTestStrategy getShardingStrategy();
@@ -88,7 +99,7 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
     
     private void execute(final boolean isPreparedStatement) {
         for (Map.Entry<DatabaseType, ShardingDataSource> each : getShardingDataSources().entrySet()) {
-            if (types.isEmpty() || types.contains(each.getKey())) {
+            if (getCurrentDatabaseType() == each.getKey()) {
                 try {
                     executeAndAssertSQL(isPreparedStatement, each.getValue());
                     //CHECKSTYLE:OFF
@@ -110,22 +121,26 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
                 continue;
             }
             for (SQLAssertData each : sqlShardingRule.getData()) {
-                String strategyName = getShardingStrategy().name();
-                // TODO DML和DQL保持一直，去掉DML中XML名称里面的placeholder
-                String expected = null == each.getExpected() ? "integrate/dataset/EmptyTable.xml"
-                        : String.format("integrate/dataset/%s/expect/" + each.getExpected(), strategyName, strategyName);
-                URL url = AbstractSQLAssertTest.class.getClassLoader().getResource(expected);
-                if (null == url) {
-                    throw new RuntimeException("Wrong expected file:" + expected);
-                }
-                File expectedDataSetFile = new File(url.getPath());
+                File expectedDataSetFile = getExpectedFile(each.getExpected());
                 if (sql.toUpperCase().startsWith("SELECT")) {
-                    assertSelectSql(isPreparedStatement, shardingDataSource, each, expectedDataSetFile);
-                } else {
-                    assertDmlSql(isPreparedStatement, shardingDataSource, each, expectedDataSetFile);
+                    assertDqlSql(isPreparedStatement, shardingDataSource, each, expectedDataSetFile);
+                } else  {
+                    assertDmlAndDdlSql(isPreparedStatement, shardingDataSource, each, expectedDataSetFile);
                 }
             }
         }
+    }
+    
+    private File getExpectedFile(final String expected) {
+        String strategyName = getShardingStrategy().name();
+        // TODO DML和DQL保持一直，去掉DML中XML名称里面的placeholder
+        String expectedFile = null == expected ? "integrate/dataset/EmptyTable.xml"
+                : String.format("integrate/dataset/%s/expect/" + expected, strategyName, strategyName);
+        URL url = AbstractSQLAssertTest.class.getClassLoader().getResource(expectedFile);
+        if (null == url) {
+            throw new RuntimeException("Wrong expected file:" + expectedFile);
+        }
+        return new File(url.getPath());
     }
     
     private boolean needAssert(final SQLShardingRule sqlShardingRule) {
@@ -141,7 +156,7 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
         return false;
     }
     
-    private void assertSelectSql(final boolean isPreparedStatement, final ShardingDataSource shardingDataSource, final SQLAssertData data, final File expectedDataSetFile)
+    private void assertDqlSql(final boolean isPreparedStatement, final ShardingDataSource shardingDataSource, final SQLAssertData data, final File expectedDataSetFile)
             throws MalformedURLException, SQLException, DatabaseUnitException {
         if (isPreparedStatement) {
             executeQueryWithPreparedStatement(shardingDataSource, getParameters(data), expectedDataSetFile);
@@ -150,7 +165,7 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
         }
     }
     
-    private void assertDmlSql(final boolean isPreparedStatement, final ShardingDataSource shardingDataSource, final SQLAssertData data, final File expectedDataSetFile)
+    private void assertDmlAndDdlSql(final boolean isPreparedStatement, final ShardingDataSource shardingDataSource, final SQLAssertData data, final File expectedDataSetFile)
             throws MalformedURLException, SQLException, DatabaseUnitException {
         if (isPreparedStatement) {
             executeWithPreparedStatement(shardingDataSource, getParameters(data));
@@ -213,7 +228,7 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
             expectedDataSet.addReplacementObject("[null]", null);
             for (ITable each : expectedDataSet.getTables()) {
                 String tableName = each.getTableMetaData().getTableName();
-                ITable actualTable = DBUnitUtil.getConnection(new DataBaseEnvironment(DatabaseType.valueFrom(conn.getMetaData().getDatabaseProductName())), conn)
+                ITable actualTable = DBUnitUtil.getConnection(new DatabaseEnvironment(DatabaseType.valueFrom(conn.getMetaData().getDatabaseProductName())), conn)
                         .createTable(tableName, preparedStatement);
                 assertEquals(expectedDataSet.getTable(tableName), actualTable);
             }
@@ -238,7 +253,7 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
             expectedDataSet.addReplacementObject("[null]", null);
             for (ITable each : expectedDataSet.getTables()) {
                 String tableName = each.getTableMetaData().getTableName();
-                ITable actualTable = DBUnitUtil.getConnection(new DataBaseEnvironment(DatabaseType.valueFrom(conn.getMetaData().getDatabaseProductName())), conn)
+                ITable actualTable = DBUnitUtil.getConnection(new DatabaseEnvironment(DatabaseType.valueFrom(conn.getMetaData().getDatabaseProductName())), conn)
                         .createQueryTable(tableName, querySql);
                 assertEquals(expectedDataSet.getTable(tableName), actualTable);
             }
@@ -246,13 +261,16 @@ public abstract class AbstractSQLAssertTest extends AbstractSQLTest {
     }
     
     private void assertResult(final Connection connection, final File file) throws MalformedURLException, SQLException, DatabaseUnitException {
+        if (sql.contains("TEMP")) {
+            return;
+        }
         ITableIterator expectedTableIterator = new FlatXmlDataSetBuilder().build(file).iterator();
         try (Connection conn = connection) {
             while (expectedTableIterator.next()) {
                 ITable expectedTable = expectedTableIterator.getTable();
                 String actualTableName = expectedTable.getTableMetaData().getTableName();
                 String verifySql = "SELECT * FROM " + actualTableName + " WHERE status = '" + getStatus(file) + "'";
-                ITable actualTable = DBUnitUtil.getConnection(new DataBaseEnvironment(DatabaseType.valueFrom(conn.getMetaData().getDatabaseProductName())), conn)
+                ITable actualTable = DBUnitUtil.getConnection(new DatabaseEnvironment(DatabaseType.valueFrom(conn.getMetaData().getDatabaseProductName())), conn)
                         .createQueryTable(actualTableName, verifySql);
                 assertEquals(expectedTable, actualTable);
             }

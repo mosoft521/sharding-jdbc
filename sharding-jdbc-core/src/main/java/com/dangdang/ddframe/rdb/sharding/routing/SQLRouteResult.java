@@ -17,7 +17,7 @@
 
 package com.dangdang.ddframe.rdb.sharding.routing;
 
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.SQLStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.SQLStatement;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * SQL路由结果.
+ * SQL route result.
  * 
  * @author gaohongtao
  * @author zhangliang

@@ -26,8 +26,8 @@ import com.dangdang.ddframe.rdb.sharding.jdbc.core.resultset.GeneratedKeysResult
 import com.dangdang.ddframe.rdb.sharding.jdbc.core.resultset.ShardingResultSet;
 import com.dangdang.ddframe.rdb.sharding.merger.MergeEngine;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.GeneratedKey;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dml.insert.InsertStatement;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.SelectStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dml.insert.InsertStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dql.select.SelectStatement;
 import com.dangdang.ddframe.rdb.sharding.routing.SQLExecutionUnit;
 import com.dangdang.ddframe.rdb.sharding.routing.SQLRouteResult;
 import com.dangdang.ddframe.rdb.sharding.routing.StatementRoutingEngine;
@@ -47,7 +47,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * 支持分片的静态语句对象.
+ * Statement that support sharding.
  * 
  * @author gaohongtao
  * @author caohao
@@ -107,7 +107,7 @@ public class ShardingStatement extends AbstractStatementAdapter {
         try {
             List<ResultSet> resultSets = generateExecutor(sql).executeQuery();
             result = new ShardingResultSet(
-                    resultSets, new MergeEngine(shardingConnection.getShardingContext().getDatabaseType(), resultSets, (SelectStatement) getRouteResult().getSqlStatement()).merge());
+                    resultSets, new MergeEngine(resultSets, (SelectStatement) getRouteResult().getSqlStatement()).merge());
         } finally {
             setCurrentResultSet(null);
         }
@@ -262,8 +262,7 @@ public class ShardingStatement extends AbstractStatementAdapter {
         for (Statement each : routedStatements) {
             resultSets.add(each.getResultSet());
         }
-        currentResultSet = new ShardingResultSet(resultSets, new MergeEngine(
-                shardingConnection.getShardingContext().getDatabaseType(), resultSets, (SelectStatement) getRouteResult().getSqlStatement()).merge());
+        currentResultSet = new ShardingResultSet(resultSets, new MergeEngine(resultSets, (SelectStatement) getRouteResult().getSqlStatement()).merge());
         return currentResultSet;
     }
 }

@@ -24,10 +24,11 @@ import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
 import javax.sql.DataSource;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Map;
 
 /**
@@ -44,18 +45,22 @@ public class YamlShardingDataSource extends ShardingDataSource {
     public YamlShardingDataSource(final Map<String, DataSource> dataSource, final File yamlFile) throws IOException {
         super(new ShardingRuleBuilder(yamlFile.getName(), dataSource, unmarshal(yamlFile)).build(), unmarshal(yamlFile).getProps());
     }
-    
-    public YamlShardingDataSource(final String logRoot, final InputStream inputStream) throws IOException {
-        super(new ShardingRuleBuilder(logRoot, unmarshal(inputStream)).build(), unmarshal(inputStream).getProps());
+
+    public YamlShardingDataSource(final String logRoot, final byte[] yamlByteArray) throws IOException {
+        super(new ShardingRuleBuilder(logRoot, unmarshal(yamlByteArray)).build(), unmarshal(yamlByteArray).getProps());
     }
-    
+
     private static YamlConfig unmarshal(final File yamlFile) throws IOException {
-        try (FileInputStream fileInputStream = new FileInputStream(yamlFile)) {
-            return unmarshal(fileInputStream);
+        try (
+                FileInputStream fileInputStream = new FileInputStream(yamlFile);
+                InputStreamReader inputStreamReader = new InputStreamReader(fileInputStream, "UTF-8")
+        ) {
+            return new Yaml(new Constructor(YamlConfig.class)).loadAs(inputStreamReader, YamlConfig.class);
         }
     }
-    
-    private static YamlConfig unmarshal(final InputStream inputStream) throws IOException {
-        return new Yaml(new Constructor(YamlConfig.class)).loadAs(inputStream, YamlConfig.class);
+
+    private static YamlConfig unmarshal(final byte[] yamlByteArray) throws IOException {
+        return new Yaml(new Constructor(YamlConfig.class)).loadAs(new ByteArrayInputStream(yamlByteArray), YamlConfig.class);
+
     }
 }

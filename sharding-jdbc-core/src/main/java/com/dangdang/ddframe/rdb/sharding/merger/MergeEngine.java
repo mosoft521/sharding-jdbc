@@ -17,14 +17,12 @@
 
 package com.dangdang.ddframe.rdb.sharding.merger;
 
-import com.dangdang.ddframe.rdb.sharding.constant.DatabaseType;
-import com.dangdang.ddframe.rdb.sharding.constant.OrderType;
 import com.dangdang.ddframe.rdb.sharding.merger.groupby.GroupByMemoryResultSetMerger;
 import com.dangdang.ddframe.rdb.sharding.merger.groupby.GroupByStreamResultSetMerger;
 import com.dangdang.ddframe.rdb.sharding.merger.iterator.IteratorStreamResultSetMerger;
 import com.dangdang.ddframe.rdb.sharding.merger.limit.LimitDecoratorResultSetMerger;
 import com.dangdang.ddframe.rdb.sharding.merger.orderby.OrderByStreamResultSetMerger;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.SelectStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dql.select.SelectStatement;
 import com.dangdang.ddframe.rdb.sharding.util.SQLUtil;
 
 import java.sql.ResultSet;
@@ -35,13 +33,11 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * 分片结果集归并引擎.
+ * ResultSet merge engine.
  *
  * @author zhangliang
  */
 public final class MergeEngine {
-    
-    private final DatabaseType databaseType;
     
     private final List<ResultSet> resultSets;
     
@@ -49,8 +45,7 @@ public final class MergeEngine {
     
     private final Map<String, Integer> columnLabelIndexMap;
     
-    public MergeEngine(final DatabaseType databaseType, final List<ResultSet> resultSets, final SelectStatement selectStatement) throws SQLException {
-        this.databaseType = databaseType;
+    public MergeEngine(final List<ResultSet> resultSets, final SelectStatement selectStatement) throws SQLException {
         this.resultSets = resultSets;
         this.selectStatement = selectStatement;
         columnLabelIndexMap = getColumnLabelIndexMap(resultSets.get(0));
@@ -66,10 +61,10 @@ public final class MergeEngine {
     }
     
     /**
-     * 合并结果集.
+     * Merge result sets.
      *
-     * @return 归并完毕后的结果集
-     * @throws SQLException SQL异常
+     * @return merged result set.
+     * @throws SQLException SQL exception
      */
     public ResultSetMerger merge() throws SQLException {
         selectStatement.setIndexForItems(columnLabelIndexMap);
@@ -79,13 +74,13 @@ public final class MergeEngine {
     private ResultSetMerger build() throws SQLException {
         if (!selectStatement.getGroupByItems().isEmpty() || !selectStatement.getAggregationSelectItems().isEmpty()) {
             if (selectStatement.isSameGroupByAndOrderByItems()) {
-                return new GroupByStreamResultSetMerger(columnLabelIndexMap, resultSets, selectStatement, getNullOrderType());
+                return new GroupByStreamResultSetMerger(columnLabelIndexMap, resultSets, selectStatement);
             } else {
-                return new GroupByMemoryResultSetMerger(columnLabelIndexMap, resultSets, selectStatement, getNullOrderType());
+                return new GroupByMemoryResultSetMerger(columnLabelIndexMap, resultSets, selectStatement);
             }
         }
         if (!selectStatement.getOrderByItems().isEmpty()) {
-            return new OrderByStreamResultSetMerger(resultSets, selectStatement.getOrderByItems(), getNullOrderType());
+            return new OrderByStreamResultSetMerger(resultSets, selectStatement.getOrderByItems());
         }
         return new IteratorStreamResultSetMerger(resultSets);
     }
@@ -96,12 +91,5 @@ public final class MergeEngine {
             result = new LimitDecoratorResultSetMerger(result, selectStatement.getLimit());
         }
         return result;
-    }
-    
-    private OrderType getNullOrderType() {
-        if (DatabaseType.MySQL == databaseType || DatabaseType.Oracle == databaseType || DatabaseType.H2 == databaseType) {
-            return OrderType.ASC;
-        }
-        return OrderType.DESC;
     }
 }

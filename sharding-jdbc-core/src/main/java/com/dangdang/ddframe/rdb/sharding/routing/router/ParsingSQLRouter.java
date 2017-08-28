@@ -24,9 +24,9 @@ import com.dangdang.ddframe.rdb.sharding.jdbc.core.ShardingContext;
 import com.dangdang.ddframe.rdb.sharding.metrics.MetricsContext;
 import com.dangdang.ddframe.rdb.sharding.parsing.SQLParsingEngine;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.GeneratedKey;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.SQLStatement;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dml.insert.InsertStatement;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.SelectStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.SQLStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dml.insert.InsertStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dql.select.SelectStatement;
 import com.dangdang.ddframe.rdb.sharding.rewrite.SQLBuilder;
 import com.dangdang.ddframe.rdb.sharding.rewrite.SQLRewriteEngine;
 import com.dangdang.ddframe.rdb.sharding.routing.SQLExecutionUnit;
@@ -46,7 +46,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * 需要解析的SQL路由器.
+ * SQL router with parse.
  * 
  * @author zhangiang
  */
@@ -117,7 +117,7 @@ public final class ParsingSQLRouter implements SQLRouter {
         if (1 == tableNames.size() || shardingRule.isAllBindingTables(tableNames)) {
             routingEngine = new SimpleRoutingEngine(shardingRule, parameters, tableNames.iterator().next(), sqlStatement);
         } else {
-            // TODO 可配置是否执行笛卡尔积
+            // TODO config for cartesian set
             routingEngine = new ComplexRoutingEngine(shardingRule, parameters, tableNames, sqlStatement);
         }
         return routingEngine.route();

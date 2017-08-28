@@ -21,39 +21,40 @@ import com.dangdang.ddframe.rdb.common.jaxb.helper.SQLStatementHelper;
 import com.dangdang.ddframe.rdb.common.util.SqlPlaceholderUtil;
 import com.dangdang.ddframe.rdb.sharding.api.fixture.ShardingRuleMockBuilder;
 import com.dangdang.ddframe.rdb.sharding.api.rule.ShardingRule;
+import com.dangdang.ddframe.rdb.sharding.api.rule.TableRule;
 import com.dangdang.ddframe.rdb.sharding.constant.DatabaseType;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.base.AbstractBaseParseSQLTest;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.base.AbstractBaseParseTest;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.table.Tables;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Conditions;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Limit;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.SQLStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.Assert;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.jaxb.helper.ParserJAXBHelper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 
 @RunWith(Parameterized.class)
 public final class SQLParsingEngineTest extends AbstractBaseParseSQLTest {
     
+    private final String[] parameters;
+    
     public SQLParsingEngineTest(
-            final String testCaseName, final String[] parameters, final Tables expectedTables, 
-            final Conditions expectedConditions, final SQLStatement expectedSQLStatement, final Limit expectedLimit) {
-        super(testCaseName, parameters, expectedTables, expectedConditions, expectedSQLStatement, expectedLimit);
+            final String testCaseName, final DatabaseType databaseType, final Assert assertObj) {
+        super(testCaseName, databaseType, assertObj);
+        parameters = ParserJAXBHelper.getParameters(assertObj.getParameters());
     }
     
-    @Parameters(name = "{0}")
+    @Parameters(name = "{0}In{1}")
     public static Collection<Object[]> dataParameters() {
         return AbstractBaseParseTest.dataParameters();
     }
     
     @Test
     public void assertStatement() {
-        for (DatabaseType each : SQLStatementHelper.getTypes(getTestCaseName())) {
-            assertStatement(new SQLParsingEngine(each, SqlPlaceholderUtil.replaceStatement(SQLStatementHelper.getSql(getTestCaseName()), getParameters()), buildShardingRule()).parse());
-        }
+        assertStatement(new SQLParsingEngine(getDatabaseType(), SqlPlaceholderUtil.replaceStatement(SQLStatementHelper.getSql(getTestCaseName()), parameters), buildShardingRule()).parse());
     }
     
     @Test
@@ -64,7 +65,8 @@ public final class SQLParsingEngineTest extends AbstractBaseParseSQLTest {
     }
     
     private ShardingRule buildShardingRule() {
-        return new ShardingRuleMockBuilder().addShardingColumns("user_id").addShardingColumns("order_id")
-                .addGenerateKeyColumn("t_order", "order_id").build();
+        TableRule orderTableRule = TableRule.builder("t_order").actualTables(Collections.singletonList("t_order")).dataSourceNames(Arrays.asList("db0", "db1")).build();
+        return new ShardingRuleMockBuilder().addTableRules(orderTableRule).addShardingColumns("user_id").addShardingColumns("order_id").addShardingColumns("item_id")
+                .addGenerateKeyColumn("t_order_item", "item_id").build();
     }
 }

@@ -25,7 +25,7 @@ import lombok.Setter;
 import lombok.ToString;
 
 /**
- * 排序项.
+ * Order item.
  *
  * @author zhangliang
  */
@@ -41,45 +41,50 @@ public final class OrderItem {
     
     private final OrderType type;
     
+    private final OrderType nullOrderType;
+    
     private int index = -1;
     
     private Optional<String> alias;
     
-    public OrderItem(final String name, final OrderType type, final Optional<String> alias) {
+    public OrderItem(final String name, final OrderType type, final OrderType nullOrderType, final Optional<String> alias) {
         this.owner = Optional.absent();
         this.name = Optional.of(name);
         this.type = type;
+        this.nullOrderType = nullOrderType;
         this.alias = alias;
     }
     
-    public OrderItem(final String owner, final String name, final OrderType type, final Optional<String> alias) {
+    public OrderItem(final String owner, final String name, final OrderType type, final OrderType nullOrderType, final Optional<String> alias) {
         this.owner = Optional.of(owner);
         this.name = Optional.of(name);
         this.type = type;
+        this.nullOrderType = nullOrderType;
         this.alias = alias;
     }
     
-    public OrderItem(final int index, final OrderType type) {
+    public OrderItem(final int index, final OrderType type, final OrderType nullOrderType) {
         owner = Optional.absent();
         name = Optional.absent();
         this.index = index;
         this.type = type;
+        this.nullOrderType = nullOrderType;
         alias = Optional.absent();
     }
     
     /**
-     * 获取列标签.
+     * Get column label.
      *
-     * @return 列标签
+     * @return column label
      */
     public String getColumnLabel() {
         return alias.isPresent() ? alias.get() : name.orNull();
     }
     
     /**
-     * 获取列全名.
+     * Get qualified name.
      *
-     * @return 列全名
+     * @return qualified name
      */
     public Optional<String> getQualifiedName() {
         if (!name.isPresent()) {

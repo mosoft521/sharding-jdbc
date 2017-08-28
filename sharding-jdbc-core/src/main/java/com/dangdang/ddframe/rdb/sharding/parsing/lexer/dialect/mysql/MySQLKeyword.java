@@ -20,7 +20,7 @@ package com.dangdang.ddframe.rdb.sharding.parsing.lexer.dialect.mysql;
 import com.dangdang.ddframe.rdb.sharding.parsing.lexer.token.Keyword;
 
 /**
- * MySQL词法关键词.
+ * MySQL keyword.
  * 
  * @author zhangliang 
  */
@@ -32,10 +32,7 @@ public enum MySQLKeyword implements Keyword {
     OFFSET, 
     VALUE, 
     BEGIN, 
-    TRUE, 
-    FALSE, 
     FORCE, 
-    ROW, 
     PARTITION, 
     DISTINCTROW, 
     KILL, 
@@ -53,5 +50,48 @@ public enum MySQLKeyword implements Keyword {
     OPTIMIZE, 
     ANALYZE, 
     IGNORE, 
-    IDENTIFIED
+    CHANGE,
+    FIRST,
+    FULLTEXT,
+    SPATIAL,
+    ALGORITHM,
+    CHARACTER,
+    COLLATE, 
+    DISCARD,
+    IMPORT,
+    VALIDATION, 
+    REORGANIZE,
+    EXCHANGE,
+    REBUILD,
+    REPAIR,
+    REMOVE,
+    UPGRADE,
+    KEY_BLOCK_SIZE,
+    AUTO_INCREMENT,
+    AVG_ROW_LENGTH,
+    CHECKSUM,
+    COMPRESSION,
+    CONNECTION,
+    DIRECTORY,
+    DELAY_KEY_WRITE,
+    ENCRYPTION,
+    ENGINE,
+    INSERT_METHOD,
+    MAX_ROWS,
+    MIN_ROWS,
+    PACK_KEYS,
+    ROW_FORMAT,
+    DYNAMIC,
+    FIXED,
+    COMPRESSED,
+    REDUNDANT,
+    COMPACT,
+    STATS_AUTO_RECALC,
+    STATS_PERSISTENT,
+    STATS_SAMPLE_PAGES, 
+    DISK,
+    MEMORY,
+    ROLLUP,
+    RESTRICT,
+    STRAIGHT_JOIN
 }

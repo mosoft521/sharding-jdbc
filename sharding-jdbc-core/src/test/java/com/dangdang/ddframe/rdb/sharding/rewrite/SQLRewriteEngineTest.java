@@ -24,7 +24,7 @@ import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.OrderItem;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.Limit;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.limit.LimitValue;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.context.table.Table;
-import com.dangdang.ddframe.rdb.sharding.parsing.parser.statement.dql.select.SelectStatement;
+import com.dangdang.ddframe.rdb.sharding.parsing.parser.sql.dql.select.SelectStatement;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.ItemsToken;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.OffsetToken;
 import com.dangdang.ddframe.rdb.sharding.parsing.parser.token.OrderByToken;
@@ -150,8 +150,8 @@ public final class SQLRewriteEngineTest {
         selectStatement.setLimit(new Limit(true));
         selectStatement.getLimit().setOffset(new LimitValue(2, -1));
         selectStatement.getLimit().setRowCount(new LimitValue(2, -1));
-        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, Optional.<String>absent()));
-        selectStatement.getGroupByItems().add(new OrderItem("x", "id", OrderType.DESC, Optional.<String>absent()));
+        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, OrderType.ASC, Optional.<String>absent()));
+        selectStatement.getGroupByItems().add(new OrderItem("x", "id", OrderType.DESC, OrderType.ASC, Optional.<String>absent()));
         selectStatement.getSqlTokens().add(new TableToken(17, "table_x"));
         selectStatement.getSqlTokens().add(new OffsetToken(33, 2));
         selectStatement.getSqlTokens().add(new RowCountToken(36, 2));
@@ -167,8 +167,8 @@ public final class SQLRewriteEngineTest {
         selectStatement.getSqlTokens().add(new TableToken(68, "table_x"));
         selectStatement.getSqlTokens().add(new OffsetToken(119, 2));
         selectStatement.getSqlTokens().add(new RowCountToken(98, 4));
-        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, Optional.<String>absent()));
-        selectStatement.getGroupByItems().add(new OrderItem("x", "id", OrderType.DESC, Optional.<String>absent()));
+        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, OrderType.ASC, Optional.<String>absent()));
+        selectStatement.getGroupByItems().add(new OrderItem("x", "id", OrderType.DESC, OrderType.ASC, Optional.<String>absent()));
         SQLRewriteEngine rewriteEngine = new SQLRewriteEngine(shardingRule,
                 "SELECT * FROM (SELECT row_.*, rownum rownum_ FROM (SELECT x.id FROM table_x x) row_ WHERE rownum<=4) t WHERE t.rownum_>2", selectStatement);
         assertThat(rewriteEngine.rewrite(true).toSQL(tableTokens), 
@@ -183,8 +183,8 @@ public final class SQLRewriteEngineTest {
         selectStatement.getSqlTokens().add(new TableToken(85, "table_x"));
         selectStatement.getSqlTokens().add(new OffsetToken(123, 2));
         selectStatement.getSqlTokens().add(new RowCountToken(26, 4));
-        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, Optional.<String>absent()));
-        selectStatement.getGroupByItems().add(new OrderItem("x", "id", OrderType.DESC, Optional.<String>absent()));
+        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, OrderType.ASC, Optional.<String>absent()));
+        selectStatement.getGroupByItems().add(new OrderItem("x", "id", OrderType.DESC, OrderType.ASC, Optional.<String>absent()));
         SQLRewriteEngine rewriteEngine = new SQLRewriteEngine(shardingRule,
                 "SELECT * FROM (SELECT TOP(4) row_number() OVER (ORDER BY x.id) AS rownum_, x.id FROM table_x x) AS row_ WHERE row_.rownum_>2", selectStatement);
         assertThat(rewriteEngine.rewrite(true).toSQL(tableTokens), 
@@ -233,8 +233,8 @@ public final class SQLRewriteEngineTest {
     @Test
     public void assertRewriteForDerivedOrderBy() {
         selectStatement.setGroupByLastPosition(61);
-        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, Optional.<String>absent()));
-        selectStatement.getOrderByItems().add(new OrderItem("x", "name", OrderType.DESC, Optional.<String>absent()));
+        selectStatement.getOrderByItems().add(new OrderItem("x", "id", OrderType.ASC, OrderType.ASC, Optional.<String>absent()));
+        selectStatement.getOrderByItems().add(new OrderItem("x", "name", OrderType.DESC, OrderType.ASC, Optional.<String>absent()));
         selectStatement.getSqlTokens().add(new TableToken(25, "table_x"));
         selectStatement.getSqlTokens().add(new OrderByToken(61));
         SQLRewriteEngine rewriteEngine = new SQLRewriteEngine(shardingRule, "SELECT x.id, x.name FROM table_x x GROUP BY x.id, x.name DESC", selectStatement);
