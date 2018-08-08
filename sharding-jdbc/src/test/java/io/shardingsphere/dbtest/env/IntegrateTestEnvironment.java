@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2015 dangdang.com.
+ * Copyright 2016-2018 shardingsphere.io.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 
 package io.shardingsphere.dbtest.env;
 
+import com.google.common.base.Splitter;
 import io.shardingsphere.core.constant.DatabaseType;
-import io.shardingsphere.dbtest.StartTest;
 import io.shardingsphere.dbtest.env.datasource.DatabaseEnvironment;
 import lombok.Getter;
 
@@ -39,7 +39,9 @@ public final class IntegrateTestEnvironment {
     
     private static final IntegrateTestEnvironment INSTANCE = new IntegrateTestEnvironment();
     
-    private final boolean initialized;
+    private final boolean runAdditionalTestCases;
+    
+    private final Collection<String> shardingRuleTypes;
     
     private final Collection<DatabaseType> databaseTypes;
     
@@ -48,11 +50,12 @@ public final class IntegrateTestEnvironment {
     private IntegrateTestEnvironment() {
         Properties prop = new Properties();
         try {
-            prop.load(StartTest.class.getClassLoader().getResourceAsStream("integrate/env.properties"));
+            prop.load(IntegrateTestEnvironment.class.getClassLoader().getResourceAsStream("integrate/env.properties"));
         } catch (final IOException ex) {
             ex.printStackTrace();
         }
-        initialized = Boolean.valueOf(prop.getProperty("initialized", Boolean.FALSE.toString()));
+        runAdditionalTestCases = Boolean.valueOf(prop.getProperty("run.additional.cases"));
+        shardingRuleTypes = Splitter.on(",").trimResults().splitToList(prop.getProperty("sharding.rule.type"));
         databaseTypes = new LinkedList<>();
         for (String each : prop.getProperty("databases", DatabaseType.H2.name()).split(",")) {
             databaseTypes.add(DatabaseType.valueOf(each.trim()));
@@ -76,7 +79,7 @@ public final class IntegrateTestEnvironment {
                             prop.getProperty("sqlserver.username", "sa"), prop.getProperty("sqlserver.password", "Jdbc1234")));
                     break;
                 case Oracle:
-                    databaseEnvironments.put(each, new DatabaseEnvironment(each, prop.getProperty("oracle.host", "127.0.0.1"), Integer.parseInt(prop.getProperty("oracle.port", "8521")),
+                    databaseEnvironments.put(each, new DatabaseEnvironment(each, prop.getProperty("oracle.host", "127.0.0.1"), Integer.parseInt(prop.getProperty("oracle.port", "1521")),
                             prop.getProperty("oracle.username", "jdbc"), prop.getProperty("oracle.password", "jdbc")));
                     break;
                 default:
