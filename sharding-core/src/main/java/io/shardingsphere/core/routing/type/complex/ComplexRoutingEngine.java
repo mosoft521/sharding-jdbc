@@ -17,9 +17,14 @@
 
 package io.shardingsphere.core.routing.type.complex;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.TreeSet;
+
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
+
 import io.shardingsphere.core.exception.ShardingException;
 import io.shardingsphere.core.optimizer.condition.ShardingConditions;
 import io.shardingsphere.core.routing.type.RoutingEngine;
@@ -29,11 +34,6 @@ import io.shardingsphere.core.rule.BindingTableRule;
 import io.shardingsphere.core.rule.ShardingRule;
 import io.shardingsphere.core.rule.TableRule;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.TreeSet;
 
 /**
  * Complex routing engine.
@@ -42,7 +42,6 @@ import java.util.TreeSet;
  * @author zhangliang
  */
 @RequiredArgsConstructor
-@Slf4j
 public final class ComplexRoutingEngine implements RoutingEngine {
     
     private final ShardingRule shardingRule;
@@ -73,7 +72,6 @@ public final class ComplexRoutingEngine implements RoutingEngine {
                 }
             }
         }
-        log.trace("mixed tables sharding result: {}", result);
         if (result.isEmpty()) {
             throw new ShardingException("Cannot find table rule and default data source with logic tables: '%s'", logicTables);
         }

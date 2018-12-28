@@ -26,9 +26,10 @@ import io.shardingsphere.core.metadata.datasource.dialect.PostgreSQLDataSourceMe
 import io.shardingsphere.core.metadata.datasource.dialect.SQLServerDataSourceMetaDataTest;
 import org.junit.runner.RunWith;
 import org.junit.runners.Suite;
+import org.junit.runners.Suite.SuiteClasses;
 
 @RunWith(Suite.class)
-@Suite.SuiteClasses({
+@SuiteClasses({
         H2DataSourceMetaDataTest.class,
         MySQLDataSourceMetaDataTest.class,
         OracleDataSourceMetaDataTest.class,
@@ -37,5 +38,5 @@ import org.junit.runners.Suite;
         DataSourceMetaDataFactoryTest.class,
         ShardingDataSourceMetaDataTest.class
     })
-public class AllMetaDataTests {
+public final class AllMetaDataTests {
 }

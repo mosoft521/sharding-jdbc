@@ -18,9 +18,9 @@
 package io.shardingsphere.core.routing;
 
 import io.shardingsphere.core.constant.DatabaseType;
+import io.shardingsphere.core.metadata.datasource.ShardingDataSourceMetaData;
 import io.shardingsphere.core.metadata.table.ShardingTableMetaData;
 import io.shardingsphere.core.parsing.parser.sql.SQLStatement;
-import io.shardingsphere.core.metadata.datasource.ShardingDataSourceMetaData;
 import io.shardingsphere.core.routing.router.masterslave.ShardingMasterSlaveRouter;
 import io.shardingsphere.core.routing.router.sharding.ShardingRouter;
 import io.shardingsphere.core.routing.router.sharding.ShardingRouterFactory;
@@ -31,7 +31,7 @@ import java.util.Collections;
 /**
  * Statement routing engine.
  * 
- * @author zhangiang
+ * @author zhangliang
  * @author panjuan
  */
 public final class StatementRoutingEngine {
@@ -53,7 +53,7 @@ public final class StatementRoutingEngine {
      * @return route result
      */
     public SQLRouteResult route(final String logicSQL) {
-        SQLStatement sqlStatement = shardingRouter.parse(logicSQL, false);
+        SQLStatement sqlStatement = shardingRouter.parse(logicSQL, true);
         return masterSlaveRouter.route(shardingRouter.route(logicSQL, Collections.emptyList(), sqlStatement));
     }
 }

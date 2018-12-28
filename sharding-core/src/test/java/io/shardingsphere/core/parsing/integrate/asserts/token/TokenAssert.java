@@ -22,7 +22,7 @@ import io.shardingsphere.core.parsing.integrate.jaxb.token.ExpectedTokens;
 import io.shardingsphere.core.parsing.parser.token.SQLToken;
 import io.shardingsphere.test.sql.SQLCaseType;
 
-import java.util.List;
+import java.util.Collection;
 
 /**
  * Token assert.
@@ -49,6 +49,8 @@ public final class TokenAssert {
     
     private final RowCountTokenAssert rowCountTokenAssert;
     
+    private final AggregationDistinctTokenAssert aggregationDistinctTokenAssert;
+    
     public TokenAssert(final SQLCaseType sqlCaseType, final SQLStatementAssertMessage assertMessage) {
         tableTokenAssert = new TableTokenAssert(assertMessage);
         schemaTokenAssert = new SchemaTokenAssert(assertMessage);
@@ -59,6 +61,7 @@ public final class TokenAssert {
         orderByTokenAssert = new OrderByTokenAssert(sqlCaseType, assertMessage);
         offsetTokenAssert = new OffsetTokenAssert(sqlCaseType, assertMessage);
         rowCountTokenAssert = new RowCountTokenAssert(sqlCaseType, assertMessage);
+        aggregationDistinctTokenAssert = new AggregationDistinctTokenAssert(assertMessage);
     }
     
     /**
@@ -67,7 +70,7 @@ public final class TokenAssert {
      * @param actual actual tokens
      * @param expected expected tokens
      */
-    public void assertTokens(final List<SQLToken> actual, final ExpectedTokens expected) {
+    public void assertTokens(final Collection<SQLToken> actual, final ExpectedTokens expected) {
         tableTokenAssert.assertTableTokens(actual, expected);
         schemaTokenAssert.assertSchemaTokens(actual, expected);
         indexTokenAssert.assertIndexToken(actual, expected);
@@ -77,5 +80,6 @@ public final class TokenAssert {
         orderByTokenAssert.assertOrderByToken(actual, expected);
         offsetTokenAssert.assertOffsetToken(actual, expected);
         rowCountTokenAssert.assertRowCountToken(actual, expected);
+        aggregationDistinctTokenAssert.assertAggregationDistinctTokens(actual, expected);
     }
 }

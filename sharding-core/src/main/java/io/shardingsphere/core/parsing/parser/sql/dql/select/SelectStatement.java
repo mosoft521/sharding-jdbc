@@ -21,7 +21,9 @@ import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import io.shardingsphere.core.parsing.parser.context.OrderItem;
 import io.shardingsphere.core.parsing.parser.context.limit.Limit;
+import io.shardingsphere.core.parsing.parser.context.selectitem.AggregationDistinctSelectItem;
 import io.shardingsphere.core.parsing.parser.context.selectitem.AggregationSelectItem;
+import io.shardingsphere.core.parsing.parser.context.selectitem.DistinctSelectItem;
 import io.shardingsphere.core.parsing.parser.context.selectitem.SelectItem;
 import io.shardingsphere.core.parsing.parser.context.selectitem.StarSelectItem;
 import io.shardingsphere.core.parsing.parser.context.table.Table;
@@ -30,7 +32,6 @@ import io.shardingsphere.core.parsing.parser.token.OffsetToken;
 import io.shardingsphere.core.parsing.parser.token.RowCountToken;
 import io.shardingsphere.core.parsing.parser.token.SQLToken;
 import io.shardingsphere.core.util.SQLUtil;
-import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
@@ -46,6 +47,7 @@ import java.util.Set;
  * Select statement.
  *
  * @author zhangliang
+ * @author panjuan
  */
 @Getter
 @Setter
@@ -66,9 +68,9 @@ public final class SelectStatement extends DQLStatement {
     
     private Limit limit;
     
-    @Getter(AccessLevel.NONE)
-    @Setter(AccessLevel.NONE)
     private SelectStatement subQueryStatement;
+    
+    private Collection<SelectStatement> subQueryStatements = new LinkedList<>();
     
     /**
      * Get alias.
@@ -104,6 +106,38 @@ public final class SelectStatement extends DQLStatement {
                 AggregationSelectItem aggregationSelectItem = (AggregationSelectItem) each;
                 result.add(aggregationSelectItem);
                 result.addAll(aggregationSelectItem.getDerivedAggregationSelectItems());
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Get distinct select items.
+     *
+     * @return aggregation distinct select items
+     */
+    public List<DistinctSelectItem> getDistinctSelectItems() {
+        List<DistinctSelectItem> result = new LinkedList<>();
+        for (SelectItem each : items) {
+            if (each instanceof DistinctSelectItem) {
+                DistinctSelectItem distinctSelectItem = (DistinctSelectItem) each;
+                result.add(distinctSelectItem);
+            }
+        }
+        return result;
+    }
+    
+    /**
+     * Get aggregation distinct select items.
+     *
+     * @return aggregation distinct select items
+     */
+    public List<AggregationDistinctSelectItem> getAggregationDistinctSelectItems() {
+        List<AggregationDistinctSelectItem> result = new LinkedList<>();
+        for (SelectItem each : items) {
+            if (each instanceof AggregationDistinctSelectItem) {
+                AggregationDistinctSelectItem distinctSelectItem = (AggregationDistinctSelectItem) each;
+                result.add(distinctSelectItem);
             }
         }
         return result;
@@ -183,10 +217,10 @@ public final class SelectStatement extends DQLStatement {
     
     private void setIndexForAggregationItem(final Map<String, Integer> columnLabelIndexMap) {
         for (AggregationSelectItem each : getAggregationSelectItems()) {
-            Preconditions.checkState(columnLabelIndexMap.containsKey(each.getColumnLabel()), String.format("Can't find index: %s, please add alias for aggregate selections", each));
+            Preconditions.checkState(columnLabelIndexMap.containsKey(each.getColumnLabel()), "Can't find index: %s, please add alias for aggregate selections", each);
             each.setIndex(columnLabelIndexMap.get(each.getColumnLabel()));
             for (AggregationSelectItem derived : each.getDerivedAggregationSelectItems()) {
-                Preconditions.checkState(columnLabelIndexMap.containsKey(derived.getColumnLabel()), String.format("Can't find index: %s", derived));
+                Preconditions.checkState(columnLabelIndexMap.containsKey(derived.getColumnLabel()), "Can't find index: %s", derived);
                 derived.setIndex(columnLabelIndexMap.get(derived.getColumnLabel()));
             }
         }
@@ -197,7 +231,7 @@ public final class SelectStatement extends DQLStatement {
             if (-1 != each.getIndex()) {
                 continue;
             }
-            Preconditions.checkState(columnLabelIndexMap.containsKey(each.getColumnLabel()), String.format("Can't find index: %s", each));
+            Preconditions.checkState(columnLabelIndexMap.containsKey(each.getColumnLabel()), "Can't find index: %s", each);
             if (columnLabelIndexMap.containsKey(each.getColumnLabel())) {
                 each.setIndex(columnLabelIndexMap.get(each.getColumnLabel()));
             }
@@ -263,7 +297,7 @@ public final class SelectStatement extends DQLStatement {
     
     private List<SQLToken> getLimitTokens(final SelectStatement selectStatement) {
         List<SQLToken> result = new LinkedList<>();
-        for (SQLToken each : selectStatement.getSqlTokens()) {
+        for (SQLToken each : selectStatement.getSQLTokens()) {
             if (each instanceof RowCountToken || each instanceof OffsetToken) {
                 result.add(each);
             }
@@ -274,16 +308,17 @@ public final class SelectStatement extends DQLStatement {
     private void resetLimitTokens(final SelectStatement selectStatement, final List<SQLToken> limitSQLTokens) {
         int count = 0;
         List<Integer> toBeRemovedIndexes = new LinkedList<>();
-        for (SQLToken each : selectStatement.getSqlTokens()) {
+        List<SQLToken> sqlTokens = selectStatement.getSQLTokens();
+        for (SQLToken each : sqlTokens) {
             if (each instanceof RowCountToken || each instanceof OffsetToken) {
                 toBeRemovedIndexes.add(count);
             }
             count++;
         }
         for (int each : toBeRemovedIndexes) {
-            selectStatement.getSqlTokens().remove(each);
+            sqlTokens.remove(each);
         }
-        selectStatement.getSqlTokens().addAll(limitSQLTokens);
+        sqlTokens.addAll(limitSQLTokens);
     }
     
     private void processItems(final SelectStatement subQueryStatement) {

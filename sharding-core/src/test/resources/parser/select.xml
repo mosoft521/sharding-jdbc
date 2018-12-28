@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <parser-result-sets>
     <parser-result sql-case-id="select_constant_without_table" />
+
+    <parser-result sql-case-id="select_with_alias" parameters="1, 1">
+        <tables>
+            <table name="t_order" alias="t_order" />
+        </tables>
+        <tokens>
+            <table-token begin-position="7" original-literals="t_order" />
+            <table-token begin-position="22" original-literals="t_order" />
+            <table-token begin-position="30" original-literals="t_order" />
+        </tokens>
+        <or-condition>
+            <and-condition>
+                <condition column-name="user_id" table-name="t_order" operator="EQUAL">
+                    <value index="0" literal="1" type="int" />
+                </condition>
+                <condition column-name="order_id" table-name="t_order" operator="EQUAL">
+                    <value index="1" literal="1" type="int" />
+                </condition>
+            </and-condition>
+        </or-condition>
+    </parser-result>
     
     <parser-result sql-case-id="select_not_equal_with_single_table" parameters="1">
         <tables>
@@ -182,9 +203,11 @@
                 </condition>
             </and-condition>
         </or-condition>
-        <aggregation-select-items>
-            <aggregation-select-item type="COUNT" inner-expression="(0)" alias="orders_count"/>
-        </aggregation-select-items>
+        <select-items>
+            <aggregation-select-items>
+                <aggregation-select-item type="COUNT" inner-expression="(0)" alias="orders_count"/>
+            </aggregation-select-items>
+        </select-items>
     </parser-result>
     
     <parser-result sql-case-id="select_sharding_route_with_binding_tables" parameters="1, 2, 9, 10">
@@ -392,33 +415,39 @@
         </or-condition>
     </parser-result>
     
-    <parser-result sql-case-id="select_equal_with_geography" parameters="'{&quot;rule2&quot;:&quot;null2&quot;}', 100, 200, 1">
+    <parser-result sql-case-id="select_equal_with_geography" parameters="'{&quot;rule2&quot;:&quot;null2&quot;}', 100, 200, 1, 2">
         <tables>
-            <table name="t_place" />
+            <table name="t_order" />
         </tables>
         <tokens>
-            <table-token begin-position="14" original-literals="t_place" />
+            <table-token begin-position="14" original-literals="t_order" />
         </tokens>
         <or-condition>
             <and-condition>
-                <condition column-name="user_new_id" table-name="t_place" operator="EQUAL">
+                <condition column-name="user_id" table-name="t_order" operator="EQUAL">
                     <value index="3" literal="1" type="int" />
+                </condition>
+                <condition column-name="order_id" table-name="t_order" operator="EQUAL">
+                    <value index="4" literal="2" type="int" />
                 </condition>
             </and-condition>
         </or-condition>
     </parser-result>
     
-    <parser-result sql-case-id="select_in_with_geography" parameters="'{&quot;rule2&quot;:&quot;null2&quot;}', '{&quot;rule3&quot;:&quot;null3&quot;}', 100, 200, 1">
+    <parser-result sql-case-id="select_in_with_geography" parameters="'{&quot;rule2&quot;:&quot;null2&quot;}', '{&quot;rule3&quot;:&quot;null3&quot;}', 100, 200, 1, 2">
         <tables>
-            <table name="t_place" />
+            <table name="t_order" />
         </tables>
         <tokens>
-            <table-token begin-position="14" original-literals="t_place" />
+            <table-token begin-position="14" original-literals="t_order" />
         </tokens>
         <or-condition>
             <and-condition>
-                <condition column-name="user_new_id" table-name="t_place" operator="EQUAL">
+                <condition column-name="user_id" table-name="t_order" operator="EQUAL">
                     <value index="4" literal="1" type="int" />
+                </condition>
+                <condition column-name="order_id" table-name="t_order" operator="EQUAL">
+                    <value index="5" literal="2" type="int" />
                 </condition>
             </and-condition>
         </or-condition>
@@ -451,5 +480,159 @@
             <order-by-column name="item_id" order-direction="ASC" />
         </order-by-columns>
     </parser-result>
+
+    <parser-result sql-case-id="select_distinct_with_single_column" >
+        <tables>
+            <table name="t_order_item" />
+        </tables>
+        <select-items>
+            <distinct-select-item>
+                <distinct-columns>
+                    <distinct-column>item_id</distinct-column>
+                </distinct-columns>
+            </distinct-select-item>
+        </select-items>
+        <tokens>
+            <table-token begin-position="29" original-literals="t_order_item" />
+        </tokens>
+        <order-by-columns>
+            <order-by-column name="item_id" order-direction="ASC" />
+        </order-by-columns>
+    </parser-result>
+
+    <parser-result sql-case-id="select_distinct_with_multi_column" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <select-items>
+            <distinct-select-item>
+                <distinct-columns>
+                    <distinct-column>order_id</distinct-column>
+                    <distinct-column>user_id</distinct-column>
+                    <distinct-column>status</distinct-column>
+                </distinct-columns>
+            </distinct-select-item>
+        </select-items>
+        <tokens>
+            <table-token begin-position="47" original-literals="t_order" />
+        </tokens>
+        <order-by-columns>
+            <order-by-column name="order_id" order-direction="ASC" />
+        </order-by-columns>
+    </parser-result>
+
+    <parser-result sql-case-id="select_distinct_with_star" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <select-items>
+            <distinct-select-item>
+                <distinct-columns>
+                </distinct-columns>
+            </distinct-select-item>
+        </select-items>
+        <tokens>
+            <table-token begin-position="23" original-literals="t_order" />
+        </tokens>
+        <order-by-columns>
+            <order-by-column name="order_id" order-direction="ASC" />
+        </order-by-columns>
+    </parser-result>
+
+    <parser-result sql-case-id="select_distinct_with_sum" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <select-items>
+            <aggregation-select-items>
+                <aggregation-select-item type="SUM" inner-expression="(DISTINCT order_id)" distinct-column="order_id" alias="s" />
+            </aggregation-select-items>
+        </select-items>
+        <tokens>
+            <table-token begin-position="37" original-literals="t_order" />
+            <aggregation-distinct-token begin-position="7" original-literals="SUM(DISTINCT order_id)" column-name="order_id" alias="s" />
+        </tokens>
+    </parser-result>
+
+    <parser-result sql-case-id="select_distinct_with_count" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <select-items>
+            <aggregation-select-items>
+                <aggregation-select-item type="COUNT" inner-expression="(DISTINCT order_id)" distinct-column="order_id" alias="c" />
+            </aggregation-select-items>
+        </select-items>
+        <tokens>
+            <table-token begin-position="39" original-literals="t_order" />
+            <aggregation-distinct-token begin-position="7" original-literals="COUNT(DISTINCT order_id)" column-name="order_id" alias="c" />
+        </tokens>
+    </parser-result>
+
+    <parser-result sql-case-id="select_distinct_with_count_group_by" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <select-items>
+            <aggregation-select-items>
+                <aggregation-select-item type="COUNT" inner-expression="(DISTINCT order_id)" distinct-column="order_id" alias="c" />
+            </aggregation-select-items>
+        </select-items>
+        <group-by-columns>
+            <group-by-column name="order_id" order-direction="ASC" />
+        </group-by-columns>
+        <order-by-columns>
+            <order-by-column name="order_id" order-direction="ASC" />
+        </order-by-columns>
+        <tokens>
+            <table-token begin-position="49" original-literals="t_order" />
+            <aggregation-distinct-token begin-position="7" original-literals="COUNT(DISTINCT order_id)" column-name="order_id" alias="c" />
+        </tokens>
+    </parser-result>
     
+    <parser-result sql-case-id="select_with_schema" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <tokens>
+            <table-token begin-position="14" skipped-schema-name-length = "4" original-literals="t_order" />
+        </tokens>
+    </parser-result>
+    
+    <parser-result sql-case-id="select_escape_with_single_quota" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <tokens>
+            <table-token begin-position="14" original-literals="t_order" />
+        </tokens>
+    </parser-result>
+    
+    <parser-result sql-case-id="select_escape_with_double_quota" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <tokens>
+            <table-token begin-position="14" original-literals="t_order" />
+        </tokens>
+    </parser-result>
+    
+    
+    <parser-result sql-case-id="select_with_block_comment" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <tokens>
+            <table-token begin-position="83" original-literals="t_order" />
+        </tokens>
+    </parser-result>
+    
+    <parser-result sql-case-id="select_with_single_comment" >
+        <tables>
+            <table name="t_order" />
+        </tables>
+        <tokens>
+            <table-token begin-position="77" original-literals="t_order" />
+        </tokens>
+    </parser-result>
 </parser-result-sets>

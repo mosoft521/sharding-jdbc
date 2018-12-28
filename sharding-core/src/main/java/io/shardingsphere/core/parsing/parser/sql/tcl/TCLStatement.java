@@ -17,11 +17,16 @@
 
 package io.shardingsphere.core.parsing.parser.sql.tcl;
 
+import io.shardingsphere.core.constant.DatabaseType;
 import io.shardingsphere.core.constant.SQLType;
+import io.shardingsphere.core.constant.transaction.TransactionOperationType;
+import io.shardingsphere.core.parsing.lexer.LexerEngine;
 import io.shardingsphere.core.parsing.lexer.token.DefaultKeyword;
 import io.shardingsphere.core.parsing.lexer.token.Keyword;
 import io.shardingsphere.core.parsing.lexer.token.TokenType;
 import io.shardingsphere.core.parsing.parser.sql.AbstractSQLStatement;
+import lombok.Getter;
+import lombok.Setter;
 import lombok.ToString;
 
 import java.util.Arrays;
@@ -31,15 +36,25 @@ import java.util.Collection;
  * Transaction Control Language statement.
  *
  * @author zhangliang
+ * @author maxiaoguang
  */
 @ToString(callSuper = true)
-public final class TCLStatement extends AbstractSQLStatement {
+public class TCLStatement extends AbstractSQLStatement {
     
     private static final Collection<Keyword> STATEMENT_PREFIX = Arrays.<Keyword>asList(
-            DefaultKeyword.SET, DefaultKeyword.COMMIT, DefaultKeyword.ROLLBACK, DefaultKeyword.SAVEPOINT, DefaultKeyword.BEGIN);
+            DefaultKeyword.COMMIT, DefaultKeyword.ROLLBACK, DefaultKeyword.SAVEPOINT, DefaultKeyword.BEGIN);
+    
+    @Getter
+    @Setter
+    private TransactionOperationType operationType;
     
     public TCLStatement() {
         super(SQLType.TCL);
+    }
+    
+    public TCLStatement(final TransactionOperationType operationType) {
+        super(SQLType.TCL);
+        this.operationType = operationType;
     }
     
     /**
@@ -50,5 +65,23 @@ public final class TCLStatement extends AbstractSQLStatement {
      */
     public static boolean isTCL(final TokenType tokenType) {
         return STATEMENT_PREFIX.contains(tokenType);
+    }
+    
+    /**
+     * Is TCL statement.
+     *
+     * @param dbType database type
+     * @param tokenType token type
+     * @param lexerEngine lexer engine
+     * @return is TCL or not
+     */
+    public static boolean isTCLUnsafe(final DatabaseType dbType, final TokenType tokenType, final LexerEngine lexerEngine) {
+        if (DefaultKeyword.SET.equals(tokenType) || DatabaseType.SQLServer.equals(dbType) && DefaultKeyword.IF.equals(tokenType)) {
+            lexerEngine.skipUntil(DefaultKeyword.TRANSACTION, DefaultKeyword.AUTOCOMMIT, DefaultKeyword.IMPLICIT_TRANSACTIONS);
+            if (!lexerEngine.isEnd()) {
+                return true;
+            }
+        }
+        return false;
     }
 }

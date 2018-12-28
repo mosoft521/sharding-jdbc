@@ -29,6 +29,7 @@ import io.shardingsphere.core.rewrite.placeholder.TablePlaceholder;
 import io.shardingsphere.core.routing.SQLUnit;
 import io.shardingsphere.core.routing.type.TableUnit;
 import io.shardingsphere.core.rule.DataNode;
+import io.shardingsphere.core.rule.MasterSlaveRule;
 import io.shardingsphere.core.rule.ShardingRule;
 
 import java.util.ArrayList;
@@ -118,6 +119,25 @@ public final class SQLBuilder {
         return new SQLUnit(result.toString(), parameterSets);
     }
     
+    /**
+     * Convert to SQL unit.
+     * 
+     * @param masterSlaveRule master slave rule
+     * @param shardingDataSourceMetaData sharding data source meta data
+     * @return SQL
+     */
+    public String toSQL(final MasterSlaveRule masterSlaveRule, final ShardingDataSourceMetaData shardingDataSourceMetaData) {
+        StringBuilder result = new StringBuilder();
+        for (Object each : segments) {
+            if (each instanceof SchemaPlaceholder) {
+                result.append(shardingDataSourceMetaData.getActualDataSourceMetaData(masterSlaveRule.getMasterDataSourceName()).getSchemeName());
+            } else {
+                result.append(each);
+            }
+        }
+        return result.toString();
+    }
+    
     private void appendTablePlaceholder(final TablePlaceholder tablePlaceholder, final String actualTableName, final StringBuilder stringBuilder) {
         final String logicTableName = tablePlaceholder.getLogicTableName();
         final String originalLiterals = tablePlaceholder.getOriginalLiterals();
@@ -164,6 +184,10 @@ public final class SQLBuilder {
                 parameters.addAll(shardingCondition.getParameters());
                 return;
             }
+        }
+        if (shardingCondition.getDataNodes().isEmpty()) {
+            expressions.add(shardingCondition.getInsertValueExpression());
+            parameters.addAll(shardingCondition.getParameters());
         }
     }
 }

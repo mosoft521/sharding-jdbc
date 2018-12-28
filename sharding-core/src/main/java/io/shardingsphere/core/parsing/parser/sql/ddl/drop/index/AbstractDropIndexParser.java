@@ -52,7 +52,7 @@ public abstract class AbstractDropIndexParser implements SQLParser {
     }
     
     @Override
-    public DDLStatement parse() {
+    public final DDLStatement parse() {
         lexerEngine.skipAll(getSkippedKeywordsBetweenDropAndTable());
         DDLStatement result = new DDLStatement();
         if (lexerEngine.skipIfEqual(DefaultKeyword.INDEX)) {
@@ -64,13 +64,9 @@ public abstract class AbstractDropIndexParser implements SQLParser {
         return result;
     }
     
-    protected Keyword[] getSkippedKeywordsBetweenDropAndTable() {
-        return new Keyword[0];
-    }
+    protected abstract Keyword[] getSkippedKeywordsBetweenDropAndTable();
     
-    protected Keyword[] getSkippedKeywordsBetweenDropIndexAndIndexName() {
-        return new Keyword[] {};
-    }
+    protected abstract Keyword[] getSkippedKeywordsBetweenDropIndexAndIndexName();
     
     private void parseIndex(final DDLStatement ddlStatement) {
         Token currentToken = lexerEngine.getCurrentToken();
@@ -79,9 +75,9 @@ public abstract class AbstractDropIndexParser implements SQLParser {
         lexerEngine.skipUntil(DefaultKeyword.ON);
         if (lexerEngine.skipIfEqual(DefaultKeyword.ON)) {
             tableReferencesClauseParser.parseSingleTableWithoutAlias(ddlStatement);
-            ddlStatement.getSqlTokens().add(new IndexToken(beginPosition, literals, ddlStatement.getTables().getSingleTableName()));
+            ddlStatement.addSQLToken(new IndexToken(beginPosition, literals, ddlStatement.getTables().getSingleTableName()));
         } else {
-            ddlStatement.getSqlTokens().add(new IndexToken(beginPosition, literals, ""));
+            ddlStatement.addSQLToken(new IndexToken(beginPosition, literals, ""));
         }
     }
 }
