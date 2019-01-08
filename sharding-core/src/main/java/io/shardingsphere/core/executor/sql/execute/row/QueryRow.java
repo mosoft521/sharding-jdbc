@@ -22,7 +22,7 @@ import com.google.common.collect.Lists;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-import java.util.LinkedList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -36,11 +36,10 @@ public final class QueryRow {
     
     private final List<Object> rowData;
     
-    private final List<Integer> distinctColumnIndexes = new LinkedList<>();
+    private final List<Integer> distinctColumnIndexes;
     
-    public QueryRow(final List<Object> rowData, final List<Integer> distinctColumnIndexes) {
-        this.rowData = rowData;
-        this.distinctColumnIndexes.addAll(distinctColumnIndexes);
+    public QueryRow(final List<Object> rowData) {
+        this(rowData, Collections.<Integer>emptyList());
     }
     
     /**
@@ -62,10 +61,10 @@ public final class QueryRow {
         if (distinctColumnIndexes.isEmpty()) {
             return rowData.equals(queryRow.getRowData());
         }
-        return distinctColumnIndexes.equals(queryRow.getDistinctColumnIndexes()) && isEqualByPart(queryRow);
+        return distinctColumnIndexes.equals(queryRow.getDistinctColumnIndexes()) && isEqualPartly(queryRow);
     }
     
-    private boolean isEqualByPart(final QueryRow queryRow) {
+    private boolean isEqualPartly(final QueryRow queryRow) {
         for (int i = 0; i < distinctColumnIndexes.size(); i++) {
             if (!rowData.get(i).equals(queryRow.getRowData().get(i))) {
                 return false;

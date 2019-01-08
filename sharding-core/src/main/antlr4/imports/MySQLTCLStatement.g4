@@ -22,7 +22,7 @@ commit
     : COMMIT WORK? (AND NO? CHAIN)? (NO? RELEASE)?
     ;
     
-beginWork
+beginTransaction
     : BEGIN WORK? | startTransaction
     ;
     
@@ -37,8 +37,7 @@ startTransactionCharacteristic
 rollback
     : ROLLBACK WORK? 
     (
-        (AND NO? CHAIN)? (NO? RELEASE)? 
-       | TO SAVEPOINT? ID
+     (AND NO? CHAIN)? (NO? RELEASE)? | TO SAVEPOINT? ID
     )
     ;
     

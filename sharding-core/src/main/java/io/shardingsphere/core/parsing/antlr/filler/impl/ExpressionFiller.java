@@ -21,16 +21,19 @@ import com.google.common.base.Optional;
 import io.shardingsphere.core.constant.AggregationType;
 import io.shardingsphere.core.metadata.table.ShardingTableMetaData;
 import io.shardingsphere.core.parsing.antlr.filler.SQLStatementFiller;
+import io.shardingsphere.core.parsing.antlr.filler.impl.dql.SubqueryFiller;
 import io.shardingsphere.core.parsing.antlr.sql.segment.SQLSegment;
 import io.shardingsphere.core.parsing.antlr.sql.segment.expr.CommonExpressionSegment;
 import io.shardingsphere.core.parsing.antlr.sql.segment.expr.FunctionExpressionSegment;
 import io.shardingsphere.core.parsing.antlr.sql.segment.expr.PropertyExpressionSegment;
 import io.shardingsphere.core.parsing.antlr.sql.segment.expr.StarExpressionSegment;
 import io.shardingsphere.core.parsing.antlr.sql.segment.expr.SubquerySegment;
+import io.shardingsphere.core.parsing.parser.constant.DerivedAlias;
 import io.shardingsphere.core.parsing.parser.context.selectitem.AggregationDistinctSelectItem;
 import io.shardingsphere.core.parsing.parser.context.selectitem.AggregationSelectItem;
 import io.shardingsphere.core.parsing.parser.context.selectitem.CommonSelectItem;
 import io.shardingsphere.core.parsing.parser.context.selectitem.StarSelectItem;
+import io.shardingsphere.core.parsing.parser.context.table.Table;
 import io.shardingsphere.core.parsing.parser.sql.SQLStatement;
 import io.shardingsphere.core.parsing.parser.sql.dql.select.SelectStatement;
 import io.shardingsphere.core.parsing.parser.token.AggregationDistinctToken;
@@ -75,12 +78,14 @@ public final class ExpressionFiller implements SQLStatementFiller {
     }
     
     private void fillStarExpression(final StarExpressionSegment starSegment, final SelectStatement selectStatement) {
-        if (!selectStatement.isContainStar()) {
-            selectStatement.setContainStar(true);
-        }
-        selectStatement.getItems().add(new StarSelectItem(starSegment.getOwner()));
+        selectStatement.setContainStar(true);
         Optional<String> owner = starSegment.getOwner();
-        if (owner.isPresent() && selectStatement.getTables().getTableNames().contains(owner.get())) {
+        selectStatement.getItems().add(new StarSelectItem(owner.orNull()));
+        if (!owner.isPresent()) {
+            return;
+        }
+        Optional<Table> table = selectStatement.getTables().find(owner.get());
+        if (table.isPresent() && !table.get().getAlias().isPresent()) {
             selectStatement.addSQLToken(new TableToken(starSegment.getStartPosition(), 0, owner.get()));
         }
     }
@@ -97,7 +102,7 @@ public final class ExpressionFiller implements SQLStatementFiller {
     private void fillFunctionExpression(final FunctionExpressionSegment functionSegment, final SelectStatement selectStatement, final String sql) {
         AggregationType aggregationType = null;
         for (AggregationType eachType : AggregationType.values()) {
-            if (eachType.name().equalsIgnoreCase(functionSegment.getName())) {
+            if (eachType.name().equalsIgnoreCase(functionSegment.getFunctionName())) {
                 aggregationType = eachType;
                 break;
             }
@@ -105,10 +110,14 @@ public final class ExpressionFiller implements SQLStatementFiller {
         String innerExpression = sql.substring(functionSegment.getInnerExpressionStartIndex(), functionSegment.getInnerExpressionEndIndex() + 1);
         String functionExpression = sql.substring(functionSegment.getFunctionStartIndex(), functionSegment.getInnerExpressionEndIndex() + 1);
         if (null != aggregationType) {
-            if (functionSegment.isHasDistinct()) {
+            if (functionSegment.hasDistinct()) {
                 String columnName = sql.substring(functionSegment.getDistinctColumnNameStartPosition(), functionSegment.getInnerExpressionEndIndex());
                 selectStatement.getItems().add(new AggregationDistinctSelectItem(aggregationType, innerExpression, functionSegment.getAlias(), columnName));
-                selectStatement.getSQLTokens().add(new AggregationDistinctToken(functionSegment.getFunctionStartIndex(), functionExpression, columnName));
+                Optional<String> autoAlias = Optional.absent();
+                if (DerivedAlias.isDerivedAlias(functionSegment.getAlias().get())) {
+                    autoAlias = Optional.of(functionSegment.getAlias().get());
+                }
+                selectStatement.getSQLTokens().add(new AggregationDistinctToken(functionSegment.getFunctionStartIndex(), functionExpression, columnName, autoAlias));
             } else {
                 selectStatement.getItems().add(new AggregationSelectItem(aggregationType, innerExpression, functionSegment.getAlias()));
             }
